@@ -1,0 +1,33 @@
+# Documentation site configuration.
+#
+# The configuration reference and the published JSON Schema are both generated
+# (see `mise run docs:reference` and `mise run schema`); nothing under `docs/`
+# that is generated should be edited by hand.
+
+[project]
+name = "gh-settings"
+description = "Declarative GitHub repository settings for the GitHub CLI"
+site_url = "https://gh-settings.dev"
+repo_url = "https://github.com/noirbizarre/gh-settings"
+docs_dir = "docs"
+site_dir = "site"
+
+[theme]
+name = "zensical"
+palette = "auto"
+
+[[nav]]
+title = "Home"
+path = "index.md"
+
+[[nav]]
+title = "Authentication"
+path = "authentication.md"
+
+[[nav]]
+title = "Configuration"
+path = "configuration.md"
+
+[[nav]]
+title = "Architecture decisions"
+path = "adr/README.md"
