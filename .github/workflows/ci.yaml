@@ -1,0 +1,106 @@
+name: ♻️ CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  lint:
+    name: 🕵️ Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: j178/prek-action@v2
+
+  test:
+    name: 🧪 Tests (${{ matrix.os.name }})
+    runs-on: ${{ matrix.os.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - { name: Linux, runner: ubuntu-latest }
+          - { name: macOS, runner: macos-latest }
+          - { name: Windows, runner: windows-latest }
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: taiki-e/install-action@nextest
+
+      - name: Run the test suite with coverage
+        run: cargo llvm-cov nextest --all-features --profile ci --lcov --output-path lcov.info
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - uses: codecov/codecov-action@v5
+        if: ${{ !cancelled() }}
+        with:
+          report_type: test_results
+          files: target/nextest/ci/junit.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  schema:
+    name: 📐 Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The published schema is a public contract (ADR-007). If a configuration
+      # type changed without the committed schema being regenerated, the
+      # documentation and every editor would be silently wrong.
+      - name: Check the committed schema is up to date
+        run: |
+          cargo run --quiet -- schema > /tmp/settings.json
+          if ! diff -u schema/v1/settings.json /tmp/settings.json; then
+            echo "::error::The JSON Schema is out of date. Run \`mise run schema\` and commit the result."
+            exit 1
+          fi
+
+  extension:
+    name: 🧩 Extension smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # `gh extension install` requires a binary named exactly `gh-settings`.
+      # Getting this wrong makes the extension uninstallable (ADR-014), so it is
+      # verified on every run rather than discovered at release time.
+      - name: Verify the binary name and that it runs
+        run: |
+          cargo build --release
+          test -x target/release/gh-settings
+          ./target/release/gh-settings --version
+          ./target/release/gh-settings schema > /dev/null

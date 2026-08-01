@@ -1,0 +1,54 @@
+name: 📖 Documentation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 🏗 Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: jdx/mise-action@v2
+
+      # The configuration reference is generated from the JSON Schema, never
+      # hand-written, so it cannot drift from the code (ADR-007).
+      - name: Generate the schema and reference
+        run: |
+          mkdir -p site/schema/v1
+          cargo run --quiet -- schema > site/schema/v1/settings.json
+          cp site/schema/v1/settings.json site/schema/settings.json
+
+      - name: Build the site
+        run: mise run docs:build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: 🚀 Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

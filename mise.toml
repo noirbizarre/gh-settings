@@ -1,0 +1,83 @@
+min_version = "2026.1.1"
+
+[tools]
+prek = "latest"
+cargo-binstall = "latest"
+"cargo:cargo-nextest" = "latest"
+"cargo:cargo-llvm-cov" = "latest"
+"cargo:cargo-insta" = "latest"
+typos = "latest"
+
+[tasks.default]
+description = "Format, lint, build and test"
+depends = ["fmt", "lint", "build", "test"]
+
+[tasks.build]
+description = "Build the extension"
+run = "cargo build"
+
+[tasks.release]
+description = "Build the extension in release mode"
+run = "cargo build --release"
+
+[tasks.test]
+description = "Run the test suite"
+run = "cargo nextest run"
+raw_args = true
+
+[tasks.cover]
+description = "Run the test suite with coverage and produce lcov.info"
+run = "cargo llvm-cov nextest --all-features --lcov --output-path lcov.info"
+
+[tasks."cover:html"]
+description = "Run the test suite with coverage and open the HTML report"
+run = "cargo llvm-cov nextest --all-features --open"
+
+[tasks.snapshots]
+description = "Review pending insta snapshots"
+run = "cargo insta review"
+
+[tasks.fmt]
+description = "Format the code"
+run = "cargo fmt --all"
+
+[tasks."fmt-check"]
+description = "Check the code formatting"
+run = "cargo fmt --all --check"
+
+[tasks.lint]
+description = "Lint the code"
+run = "cargo clippy --all-targets --all-features -- -Dclippy::all"
+
+[tasks.check]
+description = "Run every check the CI runs"
+depends = ["fmt-check", "lint", "test", "schema:check"]
+
+[tasks.schema]
+description = "Regenerate the published JSON Schema"
+run = "cargo run --quiet -- schema > schema/v1/settings.json"
+
+[tasks."schema:check"]
+description = "Fail if the committed JSON Schema is out of date"
+run = "cargo run --quiet -- schema | diff -u schema/v1/settings.json - "
+
+[tasks."docs:reference"]
+description = "Regenerate the configuration reference from the JSON Schema"
+run = "cargo run --quiet -- schema | python3 scripts/gen-reference.py > docs/configuration.md"
+
+[tasks."docs:build"]
+description = "Build the documentation site"
+run = "zensical build"
+
+[tasks."docs:serve"]
+description = "Serve the documentation site locally"
+run = "zensical serve"
+
+[tasks.setup]
+description = "Install the extension locally as a gh extension"
+run = "cargo install --path . --force"
+
+[tasks."gh-settings"]
+description = "Run the extension from source"
+run = "cargo run --"
+raw_args = true

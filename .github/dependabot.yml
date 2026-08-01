@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    rebase-strategy: disabled
+    open-pull-requests-limit: 10
+    groups:
+      rust-dependencies:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    rebase-strategy: disabled
+    groups:
+      actions:
+        patterns: ["*"]
