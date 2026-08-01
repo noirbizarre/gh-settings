@@ -1,0 +1,18 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:3:3]
+ 1 | version: 1
+ 2 | repository:
+ 3 |   allow_merge_commit: false
+   :   ^^^^^^^^^|^^^^^^^^
+   :            `-- at least one must stay enabled
+ 4 |   allow_squash_merge: false
+ 5 |   allow_rebase_merge: false
+   `----
+  help: enable one of `allow_merge_commit`, `allow_squash_merge` or
+        `allow_rebase_merge`

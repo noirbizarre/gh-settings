@@ -1,0 +1,14 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:6:15]
+ 4 |     target: tag
+ 5 |     rules:
+ 6 |       - type: pull_request
+   :               ^^^^^^|^^^^^
+   :                     `-- branch-only rule
+   `----

@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::parse
+
+  x unknown field `repositry`
+   ,-[[CONFIG]:2:1]
+ 1 | version: 1
+ 2 | repositry:
+   : ^^^^|^^^^
+   :     `-- unknown field
+ 3 |   description: x
+   `----
+  help: did you mean `repository`?

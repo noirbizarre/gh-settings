@@ -1,0 +1,5 @@
+---
+source: tests/validate.rs
+expression: output.stdout
+---
+✔ [CONFIG] is valid.

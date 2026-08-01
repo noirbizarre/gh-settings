@@ -1,0 +1,16 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  ! configuration has 1 warning
+   ,-[[CONFIG]:3:13]
+ 1 | version: 1
+ 2 | repository:
+ 3 |   homepage: example.com
+   :             ^^^^^|^^^^^
+   :                  `-- missing `https://`
+   `----
+  help: GitHub rewrites scheme-less homepages, which shows up as a permanent
+        diff

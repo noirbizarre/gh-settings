@@ -1,0 +1,14 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::parse
+
+  x did not find expected '-' indicator
+   ,-[[CONFIG]:3:4]
+ 1 | labels:
+ 2 |   - name: bug
+ 3 |    color: broken indent
+   :    |
+   :    `-- invalid
+   `----

@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:4:19]
+ 2 | autolinks:
+ 3 |   - key_prefix: OPS-
+ 4 |     url_template: https://example.com/browse
+   :                   ^^^^^^^^^^^^^|^^^^^^^^^^^^
+   :                                `-- no `<num>` found
+   `----
+  help: for example: https://jira.company.com/browse/<num>

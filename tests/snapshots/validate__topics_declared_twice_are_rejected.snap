@@ -1,0 +1,17 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:3]
+ 3 |   - a
+ 4 | repository:
+ 5 |   topics:
+   :   ^^^|^^
+   :      `-- conflicts with the top-level `topics`
+ 6 |     - b
+   `----
+  help: keep the top-level `topics`; `repository.topics` exists only for safe-
+        settings compatibility
