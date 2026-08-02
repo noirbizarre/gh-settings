@@ -451,10 +451,21 @@ pub fn repository_with(overrides: &[(&str, &str)]) -> String {
 }
 
 /// Filters that keep snapshots stable across machines and runs.
+///
+/// The configuration path must be matched without assuming where the operating
+/// system puts temporary directories. Anchoring on `/tmp` worked on Linux,
+/// passed on Windows through the separate drive-letter pattern, and silently
+/// failed on macOS, where `TMPDIR` lives under `/var/folders/...` — so every
+/// snapshot embedded a machine-specific path. Matching on the trailing
+/// `.github/settings.yml` instead is true on all three.
 pub fn filters() -> Vec<(&'static str, &'static str)> {
     vec![
-        (r"/tmp/[^\s]+/\.github/settings\.yml", "[CONFIG]"),
-        (r"[A-Za-z]:\\[^\s]+settings\.yml", "[CONFIG]"),
+        // Anchored on a path root, and excluding `]`, so the match cannot run
+        // backwards into miette's `,-[` frame or forwards past the filename.
+        (
+            r"(?:[A-Za-z]:)?[/\\][^\s\]]*\.github[/\\]settings\.ya?ml",
+            "[CONFIG]",
+        ),
         (r"\d+(\.\d+)?(ms|s)\b", "[DURATION]"),
     ]
 }
@@ -497,6 +508,43 @@ mod harness_tests {
                  and the difference only shows up on macOS CI"
             );
         }
+    }
+
+    /// The configuration path must be redacted wherever the OS puts temp files.
+    ///
+    /// The filter was originally anchored on `/tmp`. That held on Linux, and
+    /// Windows was covered by a separate drive-letter pattern, but macOS puts
+    /// `TMPDIR` under `/var/folders/...` — so twelve snapshots embedded a
+    /// machine-specific path and only ever failed on macOS CI.
+    #[test]
+    fn the_config_path_is_redacted_on_every_platform() {
+        let filter = &filters()[0];
+        let regex = regex_lite_matches(filter.0);
+
+        for path in [
+            // Linux
+            "/tmp/.tmpAbC123/.github/settings.yml",
+            // macOS: TMPDIR lives under /var/folders
+            "/var/folders/qx/8k2p1r9d5zq0000gn/T/.tmpAbC123/.github/settings.yml",
+            // Windows
+            r"C:\Users\runner\AppData\Local\Temp\.tmpAbC\.github\settings.yml",
+            // The .yaml spelling is accepted too
+            "/tmp/.tmpAbC123/.github/settings.yaml",
+        ] {
+            assert!(
+                regex.is_match(path),
+                "the filter would leave `{path}` in a snapshot"
+            );
+        }
+
+        // It must not run backwards into miette's `,-[` frame.
+        let framed = "   ,-[/tmp/.tmpAbC/.github/settings.yml:3:3]";
+        let redacted = regex.replace_all(framed, "[CONFIG]");
+        assert_eq!(redacted, "   ,-[[CONFIG]:3:3]");
+    }
+
+    fn regex_lite_matches(pattern: &str) -> regex_lite::Regex {
+        regex_lite::Regex::new(pattern).expect("the snapshot filter must be a valid regex")
     }
 
     #[test]

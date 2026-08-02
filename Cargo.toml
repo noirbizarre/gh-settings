@@ -72,6 +72,7 @@ assert_cmd = "2"
 insta = { version = "1", features = ["filters", "json"] }
 predicates = "3"
 pretty_assertions = "1"
+regex-lite = "0.1.9"
 rstest = "0.26"
 tempfile = "3"
 
