@@ -6,7 +6,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 fn desired(source: &str) -> RepositorySettings {
-    serde_yaml_ng::from_str(source).unwrap()
+    serde_norway::from_str(source).unwrap()
 }
 
 fn current(value: Value) -> Current {

@@ -101,7 +101,7 @@ fn identity_is_the_name_not_the_id() {
     let changes = plan(vec![protection()], vec![(999, protection())], false);
     assert!(changes.is_empty());
 
-    let yaml = serde_yaml_ng::to_string(&protection()).unwrap();
+    let yaml = serde_norway::to_string(&protection()).unwrap();
     assert!(!yaml.contains("id"), "{yaml}");
 }
 
@@ -163,8 +163,8 @@ fn an_unknown_rule_type_round_trips_untouched() {
         json!({"setting": true}),
     )]);
 
-    let yaml = serde_yaml_ng::to_string(&future).unwrap();
-    let parsed: Ruleset = serde_yaml_ng::from_str(&yaml).unwrap();
+    let yaml = serde_norway::to_string(&future).unwrap();
+    let parsed: Ruleset = serde_norway::from_str(&yaml).unwrap();
     assert_eq!(parsed, future);
 
     let body = parsed.as_body();

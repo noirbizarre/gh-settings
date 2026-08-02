@@ -29,7 +29,7 @@ manage labels alone and nothing else will move.
 Add this line to get completion and validation in your editor:
 
 ```yaml
-# yaml-language-server: $schema=https://gh-settings.dev/schema/v1/settings.json
+# yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 ```
 """
 

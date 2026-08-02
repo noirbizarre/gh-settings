@@ -43,7 +43,7 @@ fn includes_the_schema_annotation() {
 
     assert!(
         output.stdout.contains(
-            "# yaml-language-server: $schema=https://gh-settings.dev/schema/v1/settings.json"
+            "# yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json"
         ),
         "{}",
         output.stdout

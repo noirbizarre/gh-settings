@@ -263,7 +263,7 @@ mod api_shape {
     #[test]
     fn the_configuration_type_still_rejects_typos() {
         // The strictness that made the two types necessary must not be lost.
-        assert!(serde_yaml_ng::from_str::<Label>("name: bug\ncolour: d73a4a\n").is_err());
+        assert!(serde_norway::from_str::<Label>("name: bug\ncolour: d73a4a\n").is_err());
     }
 }
 
@@ -364,7 +364,7 @@ mod section {
 
     #[test]
     fn a_bare_list_does_not_prune() {
-        let section: Section = serde_yaml_ng::from_str("- name: bug\n  color: d73a4a\n").unwrap();
+        let section: Section = serde_norway::from_str("- name: bug\n  color: d73a4a\n").unwrap();
         assert!(!section.prune());
         assert_eq!(section.items().len(), 1);
     }
@@ -372,7 +372,7 @@ mod section {
     #[test]
     fn the_object_form_can_opt_into_pruning() {
         let section: Section =
-            serde_yaml_ng::from_str("prune: true\nitems:\n  - name: bug\n    color: d73a4a\n")
+            serde_norway::from_str("prune: true\nitems:\n  - name: bug\n    color: d73a4a\n")
                 .unwrap();
         assert!(section.prune());
         assert_eq!(section.items().len(), 1);
@@ -381,7 +381,7 @@ mod section {
     #[test]
     fn an_empty_list_is_managed_but_empty() {
         // Distinct from an absent section: with prune on, this means "no labels".
-        let section: Prunable<Label> = serde_yaml_ng::from_str("[]").unwrap();
+        let section: Prunable<Label> = serde_norway::from_str("[]").unwrap();
         assert!(section.items().is_empty());
     }
 }

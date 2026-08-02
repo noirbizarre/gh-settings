@@ -36,7 +36,7 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         .export(ctx.client(), &ctx.target, &ctx.args.only)
         .await?;
 
-    let document = serde_yaml_ng::to_string(&settings)
+    let document = serde_norway::to_string(&settings)
         .map_err(|error| miette::miette!("could not render the configuration: {error}"))?;
 
     let header = format!(

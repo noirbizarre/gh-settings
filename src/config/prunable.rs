@@ -89,27 +89,27 @@ mod tests {
 
     #[test]
     fn the_bare_list_form_never_prunes() {
-        let section: Prunable<String> = serde_yaml_ng::from_str("- a\n- b\n").unwrap();
+        let section: Prunable<String> = serde_norway::from_str("- a\n- b\n").unwrap();
         assert_eq!(section.items(), ["a", "b"]);
         assert!(!section.prune());
     }
 
     #[test]
     fn the_object_form_defaults_to_not_pruning() {
-        let section: Prunable<String> = serde_yaml_ng::from_str("items:\n  - a\n").unwrap();
+        let section: Prunable<String> = serde_norway::from_str("items:\n  - a\n").unwrap();
         assert!(!section.prune(), "prune must be opt-in even in object form");
     }
 
     #[test]
     fn the_object_form_can_enable_pruning() {
         let section: Prunable<String> =
-            serde_yaml_ng::from_str("prune: true\nitems:\n  - a\n").unwrap();
+            serde_norway::from_str("prune: true\nitems:\n  - a\n").unwrap();
         assert!(section.prune());
     }
 
     #[test]
     fn an_object_without_items_is_empty_but_managed() {
-        let section: Prunable<String> = serde_yaml_ng::from_str("prune: true\n").unwrap();
+        let section: Prunable<String> = serde_norway::from_str("prune: true\n").unwrap();
         assert!(section.is_empty());
         assert!(section.prune());
     }
@@ -120,8 +120,8 @@ mod tests {
             prune: true,
             items: Some(vec!["a".to_string()]),
         };
-        let yaml = serde_yaml_ng::to_string(&section).unwrap();
-        let parsed: Prunable<String> = serde_yaml_ng::from_str(&yaml).unwrap();
+        let yaml = serde_norway::to_string(&section).unwrap();
+        let parsed: Prunable<String> = serde_norway::from_str(&yaml).unwrap();
         assert_eq!(parsed, section);
     }
 }

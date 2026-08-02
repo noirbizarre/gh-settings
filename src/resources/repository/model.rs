@@ -397,7 +397,7 @@ mod tests {
     use super::*;
 
     fn parse(source: &str) -> RepositorySettings {
-        serde_yaml_ng::from_str(source).unwrap()
+        serde_norway::from_str(source).unwrap()
     }
 
     #[test]

@@ -704,7 +704,7 @@
       ]
     }
   },
-  "$id": "https://gh-settings.dev/schema/v1/settings.json",
+  "$id": "https://noirbizarre.github.io/gh-settings/schema/v1/settings.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Declarative GitHub repository settings, managed by the `gh settings` CLI extension.",

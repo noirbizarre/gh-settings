@@ -7,7 +7,7 @@
 //! Users opt into editor support with:
 //!
 //! ```yaml
-//! # yaml-language-server: $schema=https://gh-settings.dev/schema/v1/settings.json
+//! # yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 //! ```
 
 use serde_json::{Map, Value};
@@ -16,7 +16,7 @@ use crate::config::Settings;
 use crate::config::settings::CURRENT_VERSION;
 
 /// Base URL the schema is published under.
-pub const SCHEMA_BASE_URL: &str = "https://gh-settings.dev/schema";
+pub const SCHEMA_BASE_URL: &str = "https://noirbizarre.github.io/gh-settings/schema";
 
 /// The canonical `$id` of the current schema.
 pub fn schema_id() -> String {
@@ -86,7 +86,9 @@ mod tests {
         let schema = generate();
         assert_eq!(
             schema["$id"],
-            Value::String("https://gh-settings.dev/schema/v1/settings.json".into())
+            Value::String(
+                "https://noirbizarre.github.io/gh-settings/schema/v1/settings.json".into()
+            )
         );
     }
 

@@ -131,7 +131,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn findings(source: &str) -> Vec<String> {
-        let settings: Settings = serde_yaml_ng::from_str(source).unwrap();
+        let settings: Settings = serde_norway::from_str(source).unwrap();
         let spans = SpanIndex::build(source);
         let ctx = ValidateCtx::new(&spans);
         settings
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn an_empty_document_declares_nothing() {
-        let settings: Settings = serde_yaml_ng::from_str("{}").unwrap();
+        let settings: Settings = serde_norway::from_str("{}").unwrap();
         assert!(settings.is_empty());
     }
 
@@ -190,9 +190,9 @@ mod tests {
     #[test]
     fn round_trips_through_yaml() {
         let source = "version: 1\ntopics:\n  - rust\nlabels:\n  - name: bug\n    color: d73a4a\n";
-        let settings: Settings = serde_yaml_ng::from_str(source).unwrap();
-        let emitted = serde_yaml_ng::to_string(&settings).unwrap();
-        let reparsed: Settings = serde_yaml_ng::from_str(&emitted).unwrap();
+        let settings: Settings = serde_norway::from_str(source).unwrap();
+        let emitted = serde_norway::to_string(&settings).unwrap();
+        let reparsed: Settings = serde_norway::from_str(&emitted).unwrap();
         assert_eq!(reparsed.topics.unwrap().items(), ["rust"]);
     }
 }

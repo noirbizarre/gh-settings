@@ -285,7 +285,10 @@ impl HumanRenderer {
                 out,
                 "→ Use a personal access token or a GitHub App installation token."
             );
-            let _ = writeln!(out, "  See https://gh-settings.dev/authentication");
+            let _ = writeln!(
+                out,
+                "  See https://noirbizarre.github.io/gh-settings/authentication/"
+            );
         }
 
         out
@@ -439,7 +442,7 @@ mod tests {
 
         assert!(rendered.contains("Actions GITHUB_TOKEN"));
         assert!(rendered.contains("requires Administration: write"));
-        assert!(rendered.contains("gh-settings.dev/authentication"));
+        assert!(rendered.contains("noirbizarre.github.io/gh-settings/authentication/"));
     }
 
     #[test]

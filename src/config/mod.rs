@@ -82,7 +82,7 @@ pub enum ConfigError {
 /// field path, which the span index turns into a precise underline (ADR-008).
 pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError> {
     let spans = SpanIndex::build(source);
-    let deserializer = serde_yaml_ng::Deserializer::from_str(source);
+    let deserializer = serde_norway::Deserializer::from_str(source);
 
     let settings: Settings = match serde_path_to_error::deserialize(deserializer) {
         Ok(settings) => settings,

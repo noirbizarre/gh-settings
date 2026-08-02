@@ -158,7 +158,9 @@ fn the_actions_token_is_reported_as_structurally_incapable() {
         output.stdout
     );
     assert!(
-        output.stdout.contains("gh-settings.dev/authentication"),
+        output
+            .stdout
+            .contains("noirbizarre.github.io/gh-settings/authentication/"),
         "{}",
         output.stdout
     );

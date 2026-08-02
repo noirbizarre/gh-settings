@@ -176,7 +176,7 @@ mod desired_projection {
 
     #[test]
     fn reads_the_top_level_section() {
-        let settings: Settings = serde_yaml_ng::from_str("topics: [rust]").unwrap();
+        let settings: Settings = serde_norway::from_str("topics: [rust]").unwrap();
         assert_eq!(
             Topics.desired(&settings).unwrap().topics,
             ["rust".to_string()].into_iter().collect()
@@ -186,7 +186,7 @@ mod desired_projection {
     #[test]
     fn falls_back_to_the_safe_settings_spelling() {
         // One-way compatibility: we read their layout, we do not adopt it.
-        let settings: Settings = serde_yaml_ng::from_str("repository:\n  topics: [rust]").unwrap();
+        let settings: Settings = serde_norway::from_str("repository:\n  topics: [rust]").unwrap();
         assert_eq!(
             Topics.desired(&settings).unwrap().topics,
             ["rust".to_string()].into_iter().collect()
@@ -198,7 +198,7 @@ mod desired_projection {
         // The combination is rejected by `Settings::validate`; this only pins the
         // behaviour so it is deterministic rather than arbitrary.
         let settings: Settings =
-            serde_yaml_ng::from_str("topics: [top]\nrepository:\n  topics: [nested]").unwrap();
+            serde_norway::from_str("topics: [top]\nrepository:\n  topics: [nested]").unwrap();
         assert_eq!(
             Topics.desired(&settings).unwrap().topics,
             ["top".to_string()].into_iter().collect()

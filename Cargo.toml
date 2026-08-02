@@ -2,16 +2,23 @@
 name = "gh-settings"
 version = "0.0.0"
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.88"
 license = "MIT"
 authors = ["Axel H. <noirbizarre@gmail.com>"]
 description = "Declarative GitHub repository settings for the GitHub CLI"
 repository = "https://github.com/noirbizarre/gh-settings"
 homepage = "https://github.com/noirbizarre/gh-settings"
-documentation = "https://gh-settings.dev"
+documentation = "https://noirbizarre.github.io/gh-settings"
 readme = "README.md"
 keywords = ["github", "gh-extension", "settings", "declarative", "cli"]
 categories = ["command-line-utilities", "development-tools"]
+
+# gh-settings is distributed as a GitHub CLI extension and nothing else.
+# Publishing to crates.io would create a second install path
+# (`cargo install gh-settings`). Setting this makes `cargo publish` refuse
+# outright, rather than leaving the decision to depend on a registry token
+# happening to be absent.
+publish = false
 
 # The binary name is mandated by the GitHub CLI: an extension repository named
 # `gh-settings` must ship a binary named `gh-settings` for `gh extension install`
@@ -19,6 +26,10 @@ categories = ["command-line-utilities", "development-tools"]
 [[bin]]
 name = "gh-settings"
 path = "src/main.rs"
+
+[lib]
+name = "gh_settings"
+path = "src/lib.rs"
 
 [dependencies]
 # Errors & diagnostics
@@ -44,8 +55,9 @@ async-trait = "0.1"
 # Configuration
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# `serde_yaml` was archived in 2024; `serde_yaml_ng` is the maintained drop-in fork.
-serde_yaml_ng = "0.10"
+# `serde_yaml` was archived in 2024. `serde_norway` is the maintained fork, and
+# is the same one gh-ship uses.
+serde_norway = "0.9"
 # `saphyr` is parsed *in addition* to serde, purely to build a byte-span index so
 # that diagnostics can underline the exact offending node. See ADR-008.
 saphyr = "0.0.11"
@@ -64,6 +76,6 @@ rstest = "0.26"
 tempfile = "3"
 
 [profile.release]
-lto = "thin"
+lto = true
 codegen-units = 1
 strip = true
