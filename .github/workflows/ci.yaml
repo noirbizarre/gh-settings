@@ -4,30 +4,41 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
     name: 🕵️ Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
+      # The channel comes from the action ref, not rust-toolchain.toml,
+      # and each job installs the components it needs.
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
       - uses: Swatinem/rust-cache@v2
 
-      - uses: j178/prek-action@v2
+      # Tool versions come from mise.toml + mise.lock, so CI runs exactly
+      # what `mise run default` runs locally.
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.18
+          cache: true
+
+      - name: Run hooks
+        run: prek run --all-files --show-diff-on-failure
 
   test:
     name: 🧪 Tests (${{ matrix.os.name }})
@@ -36,71 +47,120 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - { name: Linux, runner: ubuntu-latest }
-          - { name: macOS, runner: macos-latest }
-          - { name: Windows, runner: windows-latest }
+          - name: Linux
+            runner: ubuntu-latest
+          - name: Windows
+            runner: windows-latest
+          - name: macOS
+            runner: macos-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-
+        with:
+          components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
 
-      - uses: taiki-e/install-action@cargo-llvm-cov
-      - uses: taiki-e/install-action@nextest
+      # nextest and llvm-cov are pinned by mise.lock rather than resolved
+      # per-run, so a tool release cannot change CI behaviour on its own.
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.18
+          cache: true
 
-      - name: Run the test suite with coverage
-        run: cargo llvm-cov nextest --all-features --profile ci --lcov --output-path lcov.info
+      - name: Run tests (with coverage)
+        run: |
+          cargo llvm-cov nextest --profile ci
+          cargo llvm-cov report --lcov --output-path lcov.info
 
-      - uses: codecov/codecov-action@v5
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
         with:
           files: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
 
-      - uses: codecov/codecov-action@v5
+      - name: Upload test results to Codecov
+        uses: codecov/codecov-action@v7
         if: ${{ !cancelled() }}
         with:
+          directory: target/nextest/ci
           report_type: test_results
-          files: target/nextest/ci/junit.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
 
+  # `rust-version` in Cargo.toml is a promise. Without a job that keeps it,
+  # it drifts the first time anyone uses a newer language feature.
+  msrv:
+    name: 🧓 MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the MSRV from Cargo.toml
+        id: msrv
+        run: |
+          version=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check --all-targets
+
+  # The configuration schema is a published contract: users reference it by URL
+  # from every settings file, and editors fetch it for completion. A change to a
+  # configuration type that does not regenerate it silently breaks both.
   schema:
     name: 📐 Schema
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
 
-      # The published schema is a public contract (ADR-007). If a configuration
-      # type changed without the committed schema being regenerated, the
-      # documentation and every editor would be silently wrong.
       - name: Check the committed schema is up to date
         run: |
-          cargo run --quiet -- schema > /tmp/settings.json
-          if ! diff -u schema/v1/settings.json /tmp/settings.json; then
+          cargo run --quiet -- schema > "$RUNNER_TEMP/settings.json"
+          if ! diff -u schema/v1/settings.json "$RUNNER_TEMP/settings.json"; then
             echo "::error::The JSON Schema is out of date. Run \`mise run schema\` and commit the result."
             exit 1
           fi
 
+      - name: Ensure `validate` needs no network, repo or auth
+        run: |
+          cargo build
+          mkdir -p "$RUNNER_TEMP/isolated/.github"
+          cd "$RUNNER_TEMP/isolated"
+          printf 'version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n' \
+            > .github/settings.yml
+          env -i "$GITHUB_WORKSPACE/target/debug/gh-settings" validate -R o/r
+
+  # gh extensions with precompiled binaries need a binary named after the
+  # extension. Getting this wrong makes it uninstallable on a *user's* machine
+  # rather than in our CI (ADR-014), so it is checked on every run.
   extension:
-    name: 🧩 Extension smoke test
+    name: 🧩 Extension
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
 
-      # `gh extension install` requires a binary named exactly `gh-settings`.
-      # Getting this wrong makes the extension uninstallable (ADR-014), so it is
-      # verified on every run rather than discovered at release time.
       - name: Verify the binary name and that it runs
         run: |
           cargo build --release
           test -x target/release/gh-settings
           ./target/release/gh-settings --version
           ./target/release/gh-settings schema > /dev/null
+
+  # gh-ship releases gh-settings. Its configuration and workflows must satisfy
+  # the contract gh-ship enforces, or the release breaks at the worst moment.
+  ship:
+    name: 🚢 Ship setup
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install gh-ship
+        run: gh extension install noirbizarre/gh-ship
+
+      - name: Validate the release setup
+        run: gh ship validate

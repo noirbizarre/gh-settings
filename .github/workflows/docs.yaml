@@ -1,8 +1,14 @@
-name: 📖 Documentation
+name: 📚 Documentation
 
 on:
   push:
     branches: [main]
+    paths:
+      - docs/**
+      - schema/**
+      - src/config/**
+      - zensical.toml
+      - .github/workflows/docs.yaml
   workflow_dispatch:
 
 permissions:
@@ -10,35 +16,55 @@ permissions:
   pages: write
   id-token: write
 
+# Only one deployment at a time; never cancel one midway.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
   build:
-    name: 🏗 Build
+    name: 🏗️ Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
 
-      - uses: jdx/mise-action@v2
+      # uv is pinned by mise.lock, so the docs build uses the same version
+      # as `mise run docs:build` locally.
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.18
+          cache: true
 
-      # The configuration reference is generated from the JSON Schema, never
-      # hand-written, so it cannot drift from the code (ADR-007).
-      - name: Generate the schema and reference
-        run: |
-          mkdir -p site/schema/v1
-          cargo run --quiet -- schema > site/schema/v1/settings.json
-          cp site/schema/v1/settings.json site/schema/settings.json
+      # The configuration reference is generated from the JSON Schema, which is
+      # itself generated from the Rust types. Regenerating here means the
+      # published reference cannot describe a version of the schema that no
+      # longer exists.
+      - name: Regenerate the configuration reference
+        run: mise run docs:reference
 
       - name: Build the site
         run: mise run docs:build
 
-      - uses: actions/upload-pages-artifact@v3
+      # The JSON Schema is a published contract: users reference it by URL from
+      # their settings file, and editors fetch it for completion. Serving it
+      # from the docs site keeps the URL in `$id` honest.
+      - name: Publish the JSON Schema
+        run: |
+          mkdir -p site/schema/v1
+          cp schema/v1/settings.json site/schema/v1/settings.json
+
+      - name: Verify the schema is reachable at its advertised URL
+        run: |
+          # The `$id` must match where we just published it, or every
+          # `$schema` reference in the wild breaks.
+          test -f site/schema/v1/settings.json
+          grep -q 'https://noirbizarre.github.io/gh-settings/schema/v1/settings.json' \
+            site/schema/v1/settings.json
+
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -48,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deploy
-        uses: actions/deploy-pages@v4
+      - id: deployment
+        uses: actions/deploy-pages@v5

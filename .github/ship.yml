@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://noirbizarre.github.io/gh-ship/schema/config/v1.json
+# gh-ship configuration
+# Docs: https://noirbizarre.github.io/gh-ship/configuration/
+#
+# gh-ship orchestrates the release; the version bump and the changelog are
+# produced by the `prepare-release` workflow using git-cliff. If this file or
+# the workflows it names stop satisfying the contract, `gh ship validate` fails
+# in CI.
+
+version: 1
+
+release_branch: release/next
+
+workflows:
+  prepare: prepare-release
+  publish: publish-release
+
+pull_request:
+  title: "Release {{ version }}"
+  header: |
+    This PR prepares the next release of gh-settings.
+
+    The version bump and changelog were produced by the `prepare-release`
+    workflow. Review the changelog, then merge — 🚢 Ship takes it from there.
+  footer: |
+    ---
+    Generated automatically by [gh-ship](https://github.com/noirbizarre/gh-ship).
+  labels: [release]
+
+release:
+  # Draft first, so the publish workflow can attach the binaries before anyone
+  # watching the repository is notified. An extension whose release is
+  # announced before its assets exist is an extension nobody can install.
+  draft: true

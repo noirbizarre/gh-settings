@@ -1,0 +1,101 @@
+name: 🚢 Ship
+
+# gh-ship releases gh-settings. This workflow does none of the release work
+# itself; it drives the two halves of the lifecycle:
+#
+#   push to main          -> `gh ship prepare` -> opens or updates the Release PR
+#   Release PR is merged  -> `gh ship release` -> tags, drafts, publishes assets,
+#                                                 then makes the release public
+#
+# Nothing to release is the common case for the first half, and costs one
+# prepare-release run reporting `changed: false` and exiting 0.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [closed]
+
+# These apply when falling back to GITHUB_TOKEN; a PAT carries its own scopes.
+permissions:
+  contents: write # create the release branch
+  actions: write # workflow_dispatch, and download its artifact
+  pull-requests: write # create or update the Release PR
+  issues: write # create missing labels
+
+# One release action at a time. Merging the Release PR fires *both* triggers —
+# the merge is also a push to main — and this queue is what keeps them from
+# interleaving. Either order is correct: if prepare runs first its
+# pending-release guard short-circuits, and if release runs first the next
+# prepare finds nothing to release.
+#
+# Never cancel: both commands block on a dispatched workflow run, and cancelling
+# here would orphan that run rather than stop it.
+concurrency:
+  group: ship
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: 🚢 Prepare
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # `gh ship prepare` blocks on the dispatched workflow; cap the wait well
+    # below its own 60 minute default so a stuck run fails the job visibly.
+    timeout-minutes: 30
+
+    # Same pattern as 🚀 Prepare Release: SHIP_TOKEN lives in this
+    # environment, and starting a release is not itself a deployment, so it
+    # stays out of the deployment history. 📦 Publish Release is the only job
+    # that registers one.
+    environment:
+      name: release
+      deployment: false
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `gh ship prepare` reads .github/ship.yml and discovers workflows
+          # from .github/workflows. Without them it cannot resolve
+          # `prepare-release` to a filename, and the dispatch fails.
+          fetch-depth: 0
+
+      - name: Install gh-ship
+        run: gh extension install noirbizarre/gh-ship
+
+      - name: Prepare the release
+        run: gh ship prepare
+
+  release:
+    name: 🚢 Release
+    # Only the Release PR, and only when it actually merged — `closed` fires for
+    # abandoned pull requests too.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.merged
+      && github.event.pull_request.head.ref == 'release/next'
+    runs-on: ubuntu-latest
+    # `gh ship release` waits on the publish workflow, which cross-compiles six
+    # targets.
+    timeout-minutes: 60
+
+    environment:
+      name: release
+      deployment: false
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install gh-ship
+        run: gh extension install noirbizarre/gh-ship
+
+      # Tags the merge commit, creates the release as a draft, dispatches
+      # 📦 Publish Release to attach the binaries, then makes it public.
+      - name: Ship the release
+        run: gh ship release

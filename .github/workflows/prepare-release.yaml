@@ -1,0 +1,177 @@
+name: 🚀 Prepare Release
+
+# gh-ship finds the run it dispatched by looking for this nonce.
+# See https://noirbizarre.github.io/gh-ship/workflows/
+run-name: 🚀 Prepare Release (ship:${{ inputs.ship_id }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      ship_id:
+        description: gh-ship correlation nonce
+        required: true
+        type: string
+      dry_run:
+        description: Produce the artifact but do not commit or push
+        required: false
+        type: boolean
+        default: false
+
+  workflow_call:
+    inputs:
+      ship_id:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+
+    # SHIP_TOKEN lives only in the `release` environment.
+    # Preparing a release is not a deployment, so this gates secrets and reviews without registering one.
+    # The deployment is publish-release.
+    environment:
+      name: release
+      deployment: false
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history *and* tags: git-cliff derives the next version from
+          # the last tag, and a shallow clone has neither.
+          fetch-depth: 0
+          fetch-tags: true
+          # The default GITHUB_TOKEN cannot trigger workflows, so a Release PR
+          # it authors would show no CI results.
+          token: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # git-cliff is pinned by mise.lock: a changelog tool that changes
+      # version between releases would silently change our release notes.
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.18
+          cache: true
+
+      # --- versioning: ours, not gh-ship's ---------------------------------
+
+      - name: Compute the next version
+        id: version
+        run: |
+          set -euo pipefail
+
+          # Compare against the last *tag*, not the version in Cargo.toml.
+          # Cargo.toml already carries the version being prepared, so
+          # comparing to it would report "no change" for the very first
+          # release and make bootstrapping impossible.
+          last_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          next_tag="$(git cliff --bumped-version)"
+
+          # This project tags without a `v` prefix, so the tag and the version
+          # are the same string. They stay separate outputs because the release
+          # artifact keeps them separate: the tag convention is a project's own
+          # choice, and gh-ship never derives one from the other.
+          {
+            echo "tag=$next_tag"
+            echo "version=$next_tag"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$last_tag" = "$next_tag" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new releasable commits since ${last_tag:-the beginning}."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing ${last_tag:-<nothing>} -> $next_tag"
+          fi
+
+      - name: Generate the changelog
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git cliff --bump -o CHANGELOG.md
+
+          # Release notes are scratch input for `jq --rawfile`, not a
+          # source file. Keep them out of the worktree so `git add -A`
+          # cannot commit them.
+          git cliff --unreleased --bump --strip all -o "$RUNNER_TEMP/ship-notes.md"
+
+          # The `## <version> - <date>` heading belongs to CHANGELOG.md. The
+          # Release PR and the GitHub Release both carry the version in their
+          # own title, so drop the first heading and the blank lines ahead of
+          # it. The `0,/^## /` range stops at the first match, leaving later
+          # `##` sections such as New Contributors alone.
+          sed -i -e '0,/^## /{/^## /d}' -e '/./,$!d' "$RUNNER_TEMP/ship-notes.md"
+
+      - name: Apply the version
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          # Only the first `version =` belongs to [package].
+          sed -i "0,/^version = \".*\"/s//version = \"$version\"/" Cargo.toml
+          cargo update --workspace
+
+      # The published JSON Schema embeds the crate version in its `$comment`,
+      # so a release that skipped this would ship a schema disagreeing with the
+      # binary that generated it. CI checks the same thing on every push.
+      - name: Regenerate the JSON Schema
+        if: steps.version.outputs.changed == 'true'
+        run: cargo run --quiet -- schema > schema/v1/settings.json
+
+      - name: Commit and push
+        if: steps.version.outputs.changed == 'true' && !inputs.dry_run
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git diff --cached --quiet || \
+            git commit -m "chore(release): ${{ steps.version.outputs.version }}"
+          git push origin HEAD
+
+      # --- the protocol ------------------------------------------------------
+
+      - name: Write the release artifact
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.version.outputs.changed }}" != "true" ]; then
+            jq -n '{schemaVersion: 1, changed: false}' > ship.release.json
+          else
+            jq -n \
+              --arg version "${{ steps.version.outputs.version }}" \
+              --arg tag     "${{ steps.version.outputs.tag }}" \
+              --rawfile notes "$RUNNER_TEMP/ship-notes.md" \
+              '{
+                "$schema": "https://noirbizarre.github.io/gh-ship/schema/release/v1.json",
+                schemaVersion: 1,
+                changed: true,
+                version: $version,
+                tag: $tag,
+                release: { notes: $notes }
+              }' > ship.release.json
+          fi
+          cat ship.release.json
+
+      - name: Validate the release artifact
+        run: |
+          gh extension install noirbizarre/gh-ship
+          gh ship validate ship.release.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ship-release
+          path: ship.release.json
+          if-no-files-found: error

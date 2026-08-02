@@ -1,0 +1,130 @@
+name: 📦 Publish Release
+
+run-name: 📦 Publish Release (ship:${{ inputs.ship_id }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      ship_id:
+        description: gh-ship correlation nonce
+        required: true
+        type: string
+      tag:
+        description: The tag being released
+        required: true
+        type: string
+
+  workflow_call:
+    inputs:
+      ship_id:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # gh extensions with precompiled binaries require assets named
+  # <os>-<arch>[.exe]. `gh extension install` picks the matching one.
+  build:
+    name: 🏗️ ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu,   runner: ubuntu-latest,  asset: linux-amd64,   cross: true }
+          - { target: aarch64-unknown-linux-gnu,  runner: ubuntu-latest,  asset: linux-arm64,   cross: true }
+          - { target: x86_64-unknown-linux-musl,  runner: ubuntu-latest,  asset: linux-amd64-musl, cross: true }
+          - { target: x86_64-apple-darwin,        runner: macos-latest,   asset: darwin-amd64,  cross: false }
+          - { target: aarch64-apple-darwin,       runner: macos-latest,   asset: darwin-arm64,  cross: false }
+          - { target: x86_64-pc-windows-msvc,     runner: windows-latest, asset: windows-amd64, cross: false, ext: .exe }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Build exactly what is being released, not a branch tip that
+          # may have moved since.
+          ref: ${{ inputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      # `cross` is only needed on the Linux cross-compilation legs, so it is
+      # installed conditionally here rather than added to mise.toml, which
+      # would pull it onto every runner in the matrix.
+      - uses: taiki-e/install-action@cross
+        if: matrix.cross
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Stage the asset
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/gh-settings${{ matrix.ext }}" \
+             "dist/gh-settings_${{ inputs.tag }}_${{ matrix.asset }}${{ matrix.ext }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: asset-${{ matrix.asset }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: 🚀 Publish
+    needs: build
+    runs-on: ubuntu-latest
+
+    # This is the deployment. Declaring a `url:` registers it in the
+    # repository's deployment list and links straight to what shipped.
+    # The environment is `release` because that is where the release
+    # secrets live.
+    environment:
+      name: release
+      url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag }}
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: asset-*
+          merge-multiple: true
+          path: dist
+
+      # The configuration schema is referenced by URL from users' settings
+      # files. Shipping it as a release asset gives anyone pinning a version
+      # something stable to point at, alongside the docs site copy.
+      - name: Attach the JSON Schema
+        run: cp schema/v1/settings.json "dist/settings.schema.json"
+
+      - name: Checksums
+        working-directory: dist
+        # `--` so an asset whose name begins with a dash is treated as a
+        # file rather than an option (shellcheck SC2035).
+        run: sha256sum -- * > SHA256SUMS
+
+      # The release already exists as a DRAFT: gh-ship created it before
+      # dispatching this workflow, and will undraft it once we succeed.
+      # That ordering is what lets assets land before anyone is notified.
+      - name: Upload assets to the draft release
+        run: gh release upload "${{ inputs.tag }}" dist/* --clobber
