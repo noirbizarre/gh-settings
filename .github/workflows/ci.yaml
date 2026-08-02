@@ -32,7 +32,7 @@ jobs:
 
       # Tool versions come from mise.toml + mise.lock, so CI runs exactly
       # what `mise run default` runs locally.
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v4.2.3
         with:
           version: 2026.7.18
           cache: true
@@ -62,7 +62,7 @@ jobs:
 
       # nextest and llvm-cov are pinned by mise.lock rather than resolved
       # per-run, so a tool release cannot change CI behaviour on its own.
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v4.2.3
         with:
           version: 2026.7.18
           cache: true
