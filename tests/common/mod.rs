@@ -273,14 +273,31 @@ fn write_stub(root: &Path, fixtures: &BTreeMap<String, Fixture>) {
 
     for (key, fixture) in fixtures {
         let filename = key.replace(['/', ' '], "_");
-        let mut contents = format!("HTTP/2.0 {} X\r\n", fixture.status);
+
+        // Three files rather than one, so the stub never has to parse an HTTP
+        // response. It used to strip the header block with
+        // `sed '1,/^\r\?$/d'`, which is GNU syntax: BSD sed on macOS matched
+        // nothing and silently deleted the whole body, so every paginated read
+        // decoded as null. Splitting the files removes the parsing entirely,
+        // and with it the class of bug.
+        let mut head = format!("HTTP/2.0 {} X\r\n", fixture.status);
         for (name, value) in &fixture.headers {
-            contents.push_str(&format!("{name}: {value}\r\n"));
+            head.push_str(&format!("{name}: {value}\r\n"));
         }
-        contents.push_str("\r\n");
-        contents.push_str(&fixture.body);
-        std::fs::write(fixtures_dir.join(format!("{filename}.http")), contents)
-            .expect("write fixture");
+        head.push_str("\r\n");
+
+        std::fs::write(
+            fixtures_dir.join(format!("{filename}.http")),
+            format!("{head}{}", fixture.body),
+        )
+        .expect("write fixture");
+        std::fs::write(fixtures_dir.join(format!("{filename}.body")), &fixture.body)
+            .expect("write fixture body");
+        std::fs::write(
+            fixtures_dir.join(format!("{filename}.status")),
+            fixture.status.to_string(),
+        )
+        .expect("write fixture status");
     }
 
     let stub = r#"#!/usr/bin/env bash
@@ -353,19 +370,16 @@ name="$(printf '%s_%s' "$method" "$endpoint" | tr '/ ' '__')"
 file="$root/fixtures/$name.http"
 
 # Real `gh` emits response headers only with --include, never with --paginate.
-emit() {
-  local path="$1"
-  if [[ "$paginate" == "1" ]]; then
-    # Strip the header block, keeping only the body.
-    sed -e '1,/^\r\?$/d' "$path"
-  else
-    cat "$path"
-  fi
-}
-
+# The two forms are pre-rendered as separate files, so this stub stays free of
+# text processing and therefore of GNU/BSD tool differences.
 if [[ -f "$file" ]]; then
-  emit "$file"
-  status="$(head -1 "$file" | awk '{print $2}')"
+  if [[ "$paginate" == "1" ]]; then
+    cat "$root/fixtures/$name.body"
+  else
+    cat "$file"
+  fi
+
+  status="$(cat "$root/fixtures/$name.status")"
   if [[ "$status" -ge 400 ]]; then
     exit 1
   fi
@@ -448,4 +462,53 @@ pub fn filters() -> Vec<(&'static str, &'static str)> {
 /// Path helper for tests that need to inspect written files.
 pub fn read(root: &Path, relative: &str) -> String {
     std::fs::read_to_string(PathBuf::from(root).join(relative)).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod harness_tests {
+    use super::*;
+
+    /// The stub must not depend on GNU-flavoured tools.
+    ///
+    /// It once stripped HTTP headers with `sed '1,/^\r\?$/d'`. That is GNU
+    /// syntax: BSD sed on macOS matched nothing, silently deleted the entire
+    /// body, and every paginated read decoded as `null` — so all 35 sandbox
+    /// tests failed on macOS while passing on Linux and Windows.
+    ///
+    /// The response is now pre-rendered into separate files, so the stub does
+    /// no text processing at all. This test keeps it that way.
+    #[test]
+    fn the_stub_does_no_text_processing() {
+        let stub = include_str!("mod.rs");
+        let start = stub.find("let stub = r#\"").expect("stub source");
+        let body = &stub[start..];
+        let end = body.find("\"#;").expect("stub end");
+        let script = &body[..end];
+
+        // Tokenise rather than substring-match: "used" contains "sed".
+        let tokens: Vec<&str> = script
+            .split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_')
+            .collect();
+
+        for tool in ["sed", "awk", "head", "tail", "cut", "expr"] {
+            assert!(
+                !tokens.contains(&tool),
+                "the stub invokes `{tool}`; text processing differs between GNU and BSD, \
+                 and the difference only shows up on macOS CI"
+            );
+        }
+    }
+
+    #[test]
+    fn every_fixture_is_written_in_all_three_forms() {
+        // The stub picks between them by flag rather than by parsing, so a
+        // missing form is a silent empty response rather than an error.
+        let runner = Sandbox::new().get("repos/o/r/labels", "[]").build();
+        let fixtures = runner.path().join("fixtures");
+
+        for suffix in ["http", "body", "status"] {
+            let path = fixtures.join(format!("GET_repos_o_r_labels.{suffix}"));
+            assert!(path.is_file(), "missing {}", path.display());
+        }
+    }
 }
