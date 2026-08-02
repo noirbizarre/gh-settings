@@ -19,7 +19,7 @@ The schema is generated from the Rust types with `schemars`, exposed through
 copy against freshly generated output, so any change to a configuration type
 that is not reflected in the schema fails the build.
 
-It is published at `https://gh-settings.dev/schema/v1/settings.json`, versioned
+It is published at `https://noirbizarre.github.io/gh-settings/schema/v1/settings.json`, versioned
 by major, and `export` writes the `# yaml-language-server: $schema=…` annotation
 into every file it generates.
 

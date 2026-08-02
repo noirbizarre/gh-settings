@@ -1,33 +1,94 @@
-# Documentation site configuration.
-#
-# The configuration reference and the published JSON Schema are both generated
-# (see `mise run docs:reference` and `mise run schema`); nothing under `docs/`
-# that is generated should be edited by hand.
+# Zensical configuration.
+# https://zensical.org/docs/setup/
 
 [project]
-name = "gh-settings"
-description = "Declarative GitHub repository settings for the GitHub CLI"
-site_url = "https://gh-settings.dev"
+
+site_name = "gh-settings"
+site_description = "Declarative GitHub repository settings — manage your repository configuration as code, from the GitHub CLI."
+site_url = "https://noirbizarre.github.io/gh-settings/"
+site_author = "noirbizarre"
+
 repo_url = "https://github.com/noirbizarre/gh-settings"
-docs_dir = "docs"
-site_dir = "site"
+repo_name = "noirbizarre/gh-settings"
+edit_uri = "edit/main/docs/"
 
-[theme]
-name = "zensical"
-palette = "auto"
+copyright = """
+Copyright &copy; 2026 noirbizarre — MIT licensed
+"""
 
-[[nav]]
-title = "Home"
-path = "index.md"
+nav = [
+  { "Home" = "index.md" },
+  { "Guides" = [
+    { "Authentication" = "authentication.md" },
+    { "Configuration" = "configuration.md" },
+  ] },
+  { "About" = [
+    { "Architecture Decisions" = "adr/README.md" },
+  ] },
+]
 
-[[nav]]
-title = "Authentication"
-path = "authentication.md"
+[project.theme]
 
-[[nav]]
-title = "Configuration"
-path = "configuration.md"
+language = "en"
 
-[[nav]]
-title = "Architecture decisions"
-path = "adr/README.md"
+features = [
+  "content.action.edit",
+  "content.code.annotate",
+  "content.code.copy",
+  "navigation.instant",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "search.suggest",
+  "toc.follow",
+]
+
+# Three entries, in this order. The first has no `scheme`, so it follows the
+# operating system — and being first, it is what a visitor gets by default. The
+# other two let anyone override that choice, which then persists.
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+primary = "black"
+accent = "indigo"
+toggle.icon = "lucide/monitor"
+toggle.name = "Following your system — switch to light"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "black"
+accent = "indigo"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "black"
+accent = "indigo"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to following your system"
+
+# Markdown extensions used by the documentation. Admonitions and tabs carry
+# most of the guidance; superfences is required for fenced code blocks with
+# annotations.
+[project.markdown_extensions.abbr]
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.superfences]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true

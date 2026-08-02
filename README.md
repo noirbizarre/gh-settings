@@ -131,12 +131,12 @@ as a build failure.
 ## 🛠 Configuration
 
 ```yaml
-# yaml-language-server: $schema=https://gh-settings.dev/schema/v1/settings.json
+# yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 version: 1
 
 repository:
   description: Declarative GitHub repository settings
-  homepage: https://gh-settings.dev
+  homepage: https://noirbizarre.github.io/gh-settings
   has_issues: true
   has_wiki: false
   allow_squash_merge: true
@@ -211,7 +211,7 @@ Add the schema annotation and get completion, validation and hover
 documentation:
 
 ```yaml
-# yaml-language-server: $schema=https://gh-settings.dev/schema/v1/settings.json
+# yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 ```
 
 `gh settings export` writes it for you.
@@ -304,14 +304,20 @@ Decisions, and what they cost, are recorded as
 ## 🤝 Contributing
 
 ```sh
-mise run          # fmt, lint, build, test
-mise run test     # cargo nextest
-mise run cover    # coverage
+mise run           # fmt, lint, lint:actions, build, test
+mise run test      # cargo nextest
+mise run cover     # coverage
 mise run snapshots # review insta snapshots
-mise run schema   # regenerate the JSON Schema
+mise run schema    # regenerate the JSON Schema
+mise run docs      # serve the documentation locally
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Releases are orchestrated by [gh-ship](https://github.com/noirbizarre/gh-ship):
+pushing to `main` maintains a Release PR carrying the version bump and
+changelog, and merging it tags, drafts and publishes. See
+[ADR-014](docs/adr/014-releases.md).
 
 ---
 

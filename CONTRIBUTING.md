@@ -7,9 +7,13 @@ and on tests.
 ## Getting set up
 
 ```sh
-mise install      # tools: prek, nextest, llvm-cov, insta, typos
-mise run          # fmt, lint, build, test
+mise install      # tools, pinned by mise.lock
+mise run          # fmt, lint, lint:actions, build, test
 ```
+
+Tool versions are resolved to exact builds in `mise.lock`, which is committed.
+CI installs from the same two files, so a tool release cannot change CI
+behaviour on its own.
 
 `mise` installs a `prek` hook that runs formatting, clippy and commitlint before
 each commit.
@@ -18,13 +22,17 @@ each commit.
 
 | Task | What it does |
 |---|---|
-| `mise run` | Format, lint, build, test |
-| `mise run test` | `cargo nextest run` |
-| `mise run cover` | Coverage to `lcov.info` |
+| `mise run` | Format, lint, lint the workflows, build, test |
+| `mise run test` | `cargo nextest run` (accepts nextest selectors) |
+| `mise run cover` | Coverage via `cargo llvm-cov` |
 | `mise run snapshots` | Review pending `insta` snapshots |
-| `mise run lint` | Clippy with `-D` warnings |
+| `mise run lint` | Clippy with `-D warnings` |
+| `mise run lint:actions` | `actionlint` over the workflows |
+| `mise run spell` | `typos` |
 | `mise run schema` | Regenerate the committed JSON Schema |
-| `mise run check` | Everything CI runs |
+| `mise run docs:reference` | Regenerate the configuration reference from it |
+| `mise run docs` | Serve the documentation locally |
+| `mise run dogfood` | `gh ship validate` — check the release setup |
 
 ## Adding support for a new GitHub setting
 
@@ -95,10 +103,18 @@ ADR in `docs/adr/`. Records are immutable: supersede rather than rewrite.
 
 ## Releases
 
-No release automation is configured yet. When it is, it must honour the asset
-naming that `gh extension install` requires — see
-[ADR-014](docs/adr/014-extension-asset-naming.md); CI already asserts the binary
-name on every run.
+Orchestrated by [gh-ship](https://github.com/noirbizarre/gh-ship), which is why
+commit messages matter: `git cliff` derives both the changelog and the next
+version number from them.
 
-`cliff.toml` is in place, so `git cliff` produces the changelog and determines
-the next version from the commit history in the meantime.
+The lifecycle is:
+
+1. push to `main` → `gh ship prepare` opens or updates the **Release PR**,
+   carrying the version bump and the changelog;
+2. review the changelog and merge it;
+3. `gh ship release` tags the merge commit, drafts the release, attaches the
+   cross-compiled binaries, and only then makes it public.
+
+Maintainers do not tag by hand. `gh ship validate` runs in CI, so a workflow
+that stops satisfying the contract fails on a pull request rather than
+mid-release. See [ADR-014](docs/adr/014-releases.md).

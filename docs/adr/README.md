@@ -19,5 +19,5 @@ supersedes it, rather than a rewrite of history.
 | [011](011-resource-ordering.md) | Resource ordering via declared dependencies | Accepted |
 | [012](012-testing-strategy.md) | Testing through a `gh` process stub and request-log assertions | Accepted |
 | [013](013-single-crate.md) | Single crate until a second consumer exists | Accepted |
-| [014](014-extension-asset-naming.md) | Release assets are named for `gh extension install` | Accepted |
+| [014](014-releases.md) | Releases are orchestrated by gh-ship | Accepted |
 | [015](015-token-requirements.md) | Token requirements are declared per resource | Accepted |
