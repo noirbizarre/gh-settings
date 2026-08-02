@@ -1,66 +1,107 @@
+# git-cliff configuration.
+#
+# gh-ship orchestrates the release but never generates changelogs — that is
+# this project's own choice of tool, invoked by
+# .github/workflows/prepare-release.yaml. It also powers
+# `git cliff --bumped-version`, which is how the prepare workflow derives the
+# next version from unreleased commits.
+#
+# Kept deliberately identical to gh-ship's own configuration, so that the
+# changelogs of the two extensions read the same way.
+
+[remote.github]
+owner = "noirbizarre"
+repo = "gh-settings"
+
 [changelog]
 header = """
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 """
-
 body = """
-{% macro print_commit(commit) -%}
-    - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
-      {% if commit.breaking %}[**breaking**] {% endif %}\
-      {{ commit.message | upper_first }} \
-      ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))\
-{% endmacro -%}
-
-{% macro remote_url() -%}
+{%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
-{% if version -%}
-    ## 🚀 [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}..{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
-{% else -%}
-    ## 🚧 Unreleased
-{% endif %}
+{% macro print_commit(commit) -%}
+    - {% if commit.scope %}**{{ commit.scope }}** {% endif %}\
+        {% if commit.breaking %} 🚨 **breaking** {% endif %}\
+        {{ commit.message | upper_first }} - \
+        ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))\
+{% endmacro -%}
 
-{% for group, commits in commits | filter(attribute="merge_commit", value=false) | group_by(attribute="group") %}
+{{ "\n" }}\
+{% if version %}\
+    {% if previous.version %}\
+        ## [{{ version }}]\
+          ({{ self::remote_url() }}/compare/{{ previous.version }}..{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+    {% else %}\
+        ## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}
+    {% endif %}\
+{% else %}\
+    ## [unreleased]
+{% endif %}\
+
+{% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
-    {% for commit in commits %}
+    {% for commit in commits
+    | filter(attribute="scope")
+    | sort(attribute="scope") %}
         {{ self::print_commit(commit=commit) }}
     {%- endfor %}
-{% endfor %}
-
-{%- if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
-  ### ❤️ New Contributors
-  {% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
-    - @{{ contributor.username }} made their first contribution in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }})
-  {%- endfor %}
+    {% for commit in commits %}
+        {%- if not commit.scope -%}
+            {{ self::print_commit(commit=commit) }}
+        {% endif -%}
+    {% endfor -%}
+{% endfor -%}
+{%- if github -%}
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+  ## ❤️ New Contributors
+{% endif %}\
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+  * @{{ contributor.username }} made their first contribution
+    {%- if contributor.pr_number %} in \
+      [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
+    {%- endif %}
+{%- endfor -%}
 {%- endif %}
 """
-
-footer = ""
 trim = true
-
+footer = ""
 postprocessors = [
-  { pattern = '<REPO>', replace = "https://github.com/noirbizarre/gh-settings" },
+  # Each release body is rendered and post-processed separately, then
+  # concatenated, so this normalises every section to end in exactly one
+  # newline. Combined with the leading newline in the body above, that gives a
+  # blank line between releases and exactly one newline at end of file — which
+  # is what prek's end-of-file-fixer wants.
+  { pattern = '\n+\z', replace = "\n" },
+  # Resolve the placeholder left by the issue-linking preprocessor below.
+  { pattern = "<REPO>", replace = "https://github.com/noirbizarre/gh-settings" },
 ]
+
 
 [git]
 conventional_commits = true
 filter_unconventional = true
 split_commits = false
-protect_breaking_commits = true
+protect_breaking_commits = false
 filter_commits = false
-tag_pattern = "[0-9]*"
 topo_order = false
 sort_commits = "newest"
+# Anchored deliberately. A bare `[0-9]*` is a regex that also matches the empty
+# string, so it matches every tag in the repository, not just versions.
+tag_pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+"
 
 commit_preprocessors = [
-  # Fix typos in commit messages before they are immortalised in the changelog.
-  { pattern = '.*', replace_command = 'typos --write-changes -' },
+  # Turn `(#123)` into a link, via the placeholder resolved in postprocessors.
+  { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))" },
+  # Fix typos in commit messages, which cannot be amended once pushed.
+  # https://github.com/crate-ci/typos
+  { pattern = ".*", replace_command = "typos --write-changes -" },
 ]
 
 commit_parsers = [
@@ -68,17 +109,18 @@ commit_parsers = [
   { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
   { message = "^perf", group = "<!-- 2 -->⚡ Performance" },
   { message = "^refactor", group = "<!-- 3 -->🔨 Refactor" },
-  { message = "^docs", group = "<!-- 4 -->📚 Documentation" },
+  { message = "^doc", group = "<!-- 4 -->📚 Documentation" },
   { message = "^test", group = "<!-- 5 -->🧪 Tests" },
   { message = "^style", group = "<!-- 6 -->🎨 Style" },
   { message = "^build", group = "<!-- 7 -->🏗️ Build" },
   { message = "^ci", group = "<!-- 8 -->🔧 CI" },
-  { message = "^revert", group = "<!-- 9 -->⏪ Reverts" },
-  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore\\(release\\):", skip = true },
   { message = "^chore\\(deps\\)", skip = true },
-  { message = "^chore", group = "<!-- 10 -->🧹 Chores" },
+  { message = "^chore", group = "<!-- 9 -->🧹 Chores" },
+  { message = "^revert", group = "<!-- 10 -->⏪ Reverts" },
 ]
 
 [bump]
+initial_tag = "0.1.0"
 features_always_bump_minor = true
 breaking_always_bump_major = true

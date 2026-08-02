@@ -20,18 +20,26 @@ target
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Coverage
-/lcov.info
-/junit.xml
+# mise is this project's toolchain manager, and CI installs from these two
+# files so local and CI runs pin identical tool versions. They are commonly
+# ignored globally as personal dev files, so un-ignore them explicitly here.
+!mise.toml
+!mise.lock
 
-# Insta
-**/*.snap.new
+# The gh-ship release artifact is produced by the prepare workflow and uploaded
+# as an artifact; it is never a source file.
+/ship.release.json
 
-# Use mise as task runner
-!/mise.toml
-!/mise.lock
-mise.*.toml
-.mise.*.toml
+# Zensical documentation build output
+site/
 
-# Node (docs tooling / commitlint)
+# Coverage and test reports
+lcov.info
+junit.xml
+*.profraw
+
+# insta pending snapshots
+*.snap.new
+
+# Node (commitlint, via prek)
 node_modules/

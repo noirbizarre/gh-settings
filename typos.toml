@@ -1,0 +1,27 @@
+# typos configuration.
+# https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = [
+  "Cargo.lock",
+  "mise.lock",
+  # Snapshots echo back the deliberate typos below, inside rendered diagnostics.
+  "tests/snapshots/**",
+  "site/**",
+  # Generated from the Rust types; fix the source, not the output.
+  "schema/**",
+  "docs/configuration.md",
+]
+
+[default.extend-words]
+# Deliberate typos, used to exercise the "did you mean?" suggestions. Each one
+# is an input to a test asserting that we propose the correct spelling.
+# Correcting them here would silently delete the tests that depend on them.
+descrption = "descrption"    # -> description
+descriptoin = "descriptoin"  # -> description
+repositry = "repositry"      # -> repository
+lables = "lables"            # -> labels
+requst = "requst"            # -> request (pull_requst -> pull_request)
+# A British spelling used deliberately in a test asserting that `colour` is
+# rejected as an unknown field, since GitHub's API spells it `color`.
+colour = "colour"

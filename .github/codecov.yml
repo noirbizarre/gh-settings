@@ -1,0 +1,19 @@
+coverage:
+  range: "80...100"
+  status:
+    project:
+      default:
+        # Target coverage percentage
+        target: auto
+        # Maximum allowed coverage drop (0.5%)
+        threshold: 0.5%
+    patch:
+      default:
+        # Require 80% coverage on new code
+        target: 80%
+        # No threshold for patch (strict)
+        threshold: 0%
+
+# Require any change in coverage to post
+comment:
+  require_changes: true

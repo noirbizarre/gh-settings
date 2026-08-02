@@ -1,3 +1,12 @@
+# Pins the Rust channel and components for local development.
+#
+# This pins the local channel only. CI selects its toolchain through the
+# `dtolnay/rust-toolchain@stable` action ref and installs its components
+# per job, because the coverage job needs `llvm-tools-preview` on top.
+#
+# The minimum supported version is declared separately as `rust-version` in
+# Cargo.toml; this file only chooses the channel to develop against.
+
 [toolchain]
 channel = "stable"
 components = ["rustfmt", "clippy"]
