@@ -7,7 +7,7 @@
 //! Users opt into editor support with:
 //!
 //! ```yaml
-//! # yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
+//! # $schema: https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 //! ```
 
 use serde_json::{Map, Value};

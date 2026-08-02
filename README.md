@@ -131,7 +131,7 @@ as a build failure.
 ## 🛠 Configuration
 
 ```yaml
-# yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
+# $schema: https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 version: 1
 
 repository:
@@ -211,7 +211,7 @@ Add the schema annotation and get completion, validation and hover
 documentation:
 
 ```yaml
-# yaml-language-server: $schema=https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
+# $schema: https://noirbizarre.github.io/gh-settings/schema/v1/settings.json
 ```
 
 `gh settings export` writes it for you.

@@ -20,8 +20,10 @@ copy against freshly generated output, so any change to a configuration type
 that is not reflected in the schema fails the build.
 
 It is published at `https://noirbizarre.github.io/gh-settings/schema/v1/settings.json`, versioned
-by major, and `export` writes the `# yaml-language-server: $schema=…` annotation
-into every file it generates.
+by major, and `export` writes the `# $schema: …` annotation
+into every file it generates. That form is preferred over the longer
+`# yaml-language-server: $schema=…` modeline because it is shorter and IntelliJ
+recognises only the former.
 
 Within a major version, changes are additive only.
 
