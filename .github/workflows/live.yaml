@@ -1,0 +1,68 @@
+name: 🌍 Live
+
+# The stub suite asserts the shape of the requests we send. It cannot assert
+# that GitHub accepts them, nor show what GitHub sends back — and both bugs
+# fixed in 0.1.0 lived in exactly that gap. This runs the real thing.
+#
+# Deliberately not on pull requests: a network-dependent, rate-limited job
+# holding a credential has no business blocking someone's PR, and forks cannot
+# read the secret anyway.
+
+on:
+  schedule:
+    # Nightly. Drift against the real API is caught within a day, which is fast
+    # enough for something no user is waiting on.
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Every test targets the same repository, so two runs would race each other.
+# Never cancel: a cancelled run leaves that repository part-way through a change.
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  live:
+    name: 🌍 Live suite
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'noirbizarre'
+    timeout-minutes: 20
+
+    # The sandbox credential lives here, alongside the release one.
+    environment:
+      name: live-test
+      deployment: false
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.18
+          cache: true
+
+      - name: Run the live suite
+        run: mise run test:live
+        env:
+          # A PAT: the resources under test need Administration: write, which
+          # cannot be granted to GITHUB_TOKEN. See docs/authentication.md.
+          GH_TOKEN: ${{ secrets.LIVE_TEST_TOKEN }}
+          GH_SETTINGS_TEST_REPO: ${{ vars.LIVE_TEST_REPO }}
+
+      # The suite cleans up after itself, but a cancelled or crashed run may
+      # not have got that far. Leaving a dirty repository would make the next
+      # run refuse to start, which is correct but unhelpful at 4am.
+      - name: Report leftovers
+        if: failure()
+        run: |
+          echo "::warning::The live suite failed. ${{ vars.LIVE_TEST_REPO }} may hold leftover configuration, which will make the next run refuse to start. Reset it before the next schedule."

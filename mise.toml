@@ -50,6 +50,14 @@ description = "Run tests (accepts nextest selectors)"
 raw_args = true
 run = "cargo nextest run"
 
+[tasks."test:live"]
+description = "Run the live suite against GH_SETTINGS_TEST_REPO"
+# Talks to a real repository, so it is opt-in twice over: the tests are
+# `#[ignore]`d, and they skip unless GH_SETTINGS_TEST_REPO names a repository
+# free of managed configuration.
+run = "cargo nextest run --profile live --run-ignored all"
+raw_args = true
+
 [tasks.cover]
 description = "Run tests with coverage"
 run = "cargo llvm-cov nextest"

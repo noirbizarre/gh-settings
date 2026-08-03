@@ -41,26 +41,23 @@ reason stops applying.
 
 ### Verification
 
-- [ ] **A live test suite** against a real throwaway repository, `#[ignore]`d and
-      gated on `GH_SETTINGS_TEST_REPO`, exercising each resource's create →
-      update → prune cycle. The stub asserts the shape of the requests we
-      *send*; only a real run asserts that GitHub accepts them, or shows what it
-      sends back. The first manual run against the API found two bugs the entire
-      stub suite could not see — a permanent diff caused by server-defaulted
-      ruleset parameters, and every HTTP error on a paginated endpoint being
-      reported as an authentication failure. It must refuse to run against a
-      repository that already has configuration, so it can never eat real
-      settings.
+- [x] **A live test suite** against a real throwaway repository, `#[ignore]`d
+      and gated on `GH_SETTINGS_TEST_REPO`. Nine tests covering each resource's
+      create → update → prune cycle, re-planning after every mutation. Runs
+      nightly and on demand; refuses to start against a repository that already
+      has managed configuration. Run it yourself with
+      `GH_SETTINGS_TEST_REPO=you/sandbox mise run test:live` — the sandbox must
+      be **public**, since a private repository on the free plan answers
+      `403 Upgrade to GitHub Pro` for rulesets.
 - [ ] **Ruleset apply-path tests through the stub.** Create, update, delete and
       prune, asserting the request log. Manually verified against the real API
       once; nothing yet stops a regression.
-- [ ] **Repository security PATCH test.** The `security_and_analysis`
-      sub-object travels in its own request with a `{status: …}` shape, and that
-      split is untested end to end.
-- [ ] **Generic idempotency contract test** over the registry: apply, re-plan,
-      assert empty — for every resource, not just labels. A missed normalisation
-      is the failure that makes the tool useless, and it currently has only
-      ad-hoc coverage.
+- [x] **Repository security PATCH test** — covered by the live suite.
+- [x] **Generic idempotency contract** — the live suite re-plans after every
+      mutation and asserts the plan is empty, for every resource. Checked
+      against reality rather than against our own fixtures, which is the only
+      version of this assertion that would have caught the ruleset permanent
+      diff.
 - [ ] **Snapshots for `plan`, `doctor` and `export`.** Only `validate` output is
       snapshotted, so the other three can regress silently.
 - [ ] **`--continue-on-error` integration test.** Implemented and unit-tested,
