@@ -24,6 +24,7 @@ nav = [
     { "CLI Reference" = "cli.md" },
   ] },
   { "About" = [
+    { "Roadmap" = "roadmap.md" },
     { "Architecture Decisions" = "adr/README.md" },
   ] },
 ]

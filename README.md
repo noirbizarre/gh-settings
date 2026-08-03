@@ -269,13 +269,16 @@ Full details, including the exact scopes each resource needs, are in
 | Labels (including renames) | ✅ |
 | Autolinks | ✅ |
 | Rulesets | ✅ |
-| Custom properties | planned |
-| Environments & variables | planned |
-| Webhooks, Pages, collaborators | planned |
-| Secrets | [out of scope](docs/adr/009-secrets-out-of-scope.md) |
+
+Custom properties, environments, variables, webhooks, Pages and collaborators
+are planned; secrets are [deliberately out of
+scope](docs/adr/009-secrets-out-of-scope.md).
 
 The guiding ambition: *if it is under the repository Settings page, it should
 eventually be manageable here.*
+
+See the **[roadmap](docs/roadmap.md)** for the full picture, including what will
+never be supported and why.
 
 ---
 

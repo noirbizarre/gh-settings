@@ -43,3 +43,7 @@ junit.xml
 
 # Node (commitlint, via prek)
 node_modules/
+
+# Agent scratch space. Excluded explicitly rather than relying on a personal
+# global ignore — the roadmap belongs in docs/roadmap.md, in the repository.
+.opencode/
