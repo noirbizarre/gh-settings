@@ -49,10 +49,13 @@ jobs:
         os:
           - name: Linux
             runner: ubuntu-latest
+            flag: linux
           - name: Windows
             runner: windows-latest
+            flag: windows
           - name: macOS
             runner: macos-latest
+            flag: macos
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -76,6 +79,9 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           files: lcov.info
+          # Flagging each leg keeps the three reports distinguishable, so a
+          # partial upload is visible rather than looking like a coverage drop.
+          flags: ${{ matrix.os.flag }}
 
       - name: Upload test results to Codecov
         uses: codecov/codecov-action@v7

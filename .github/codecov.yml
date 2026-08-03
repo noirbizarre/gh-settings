@@ -1,3 +1,22 @@
+# The `test` job is a three-OS matrix and each leg uploads its own report.
+# Without this, Codecov posts the project status as soon as the first reports
+# settle — in practice before Windows, which is ~4x slower than the other two,
+# has uploaded. That compares a partial report against a complete base and
+# reports a coverage drop that did not happen.
+codecov:
+  notify:
+    after_n_builds: 3
+
+# Every leg runs on every commit, so a missing report means a broken run,
+# not an untested platform — nothing should be carried forward to hide it.
+flags:
+  linux:
+    carryforward: false
+  windows:
+    carryforward: false
+  macos:
+    carryforward: false
+
 coverage:
   range: "80...100"
   status:
@@ -17,3 +36,5 @@ coverage:
 # Require any change in coverage to post
 comment:
   require_changes: true
+  # Held back for the same reason as the status above.
+  after_n_builds: 3
