@@ -168,13 +168,26 @@ impl GitHubClient for GhCliTransport {
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
 
-        let (status, headers, payload) = if request.paginate {
+        let (mut status, headers, payload) = if request.paginate {
+            // `--paginate` is incompatible with `--include`, so there is no
+            // status line to read. Assume success and recover the real status
+            // from the error payload below if the process failed.
             (200, Vec::new(), stdout.as_str())
         } else {
             parse_included_response(&stdout)
         };
 
         if !output.status.success() {
+            // Without `--include` there is no status line, so a failed
+            // paginated request would otherwise look like a CLI failure and be
+            // reported as "check that you are authenticated" — which is
+            // actively misleading when the truth is a 403 or a 404. Every
+            // collection resource uses `--paginate`, so this covers the most
+            // common real failure there is: the wrong token.
+            if request.paginate && status < 400 {
+                status = parse_error_status(payload, &stderr).unwrap_or(status);
+            }
+
             // `gh api` exits 1 on any HTTP error, so a parsed status tells us
             // whether this was an API rejection or a CLI failure (bad flags, no
             // auth, network down).
@@ -219,6 +232,36 @@ impl GitHubClient for GhCliTransport {
             headers,
         })
     }
+}
+
+/// Recover an HTTP status from a failed request that carried no status line.
+///
+/// `gh` reports the failure in two places, either of which may be absent:
+/// the JSON error body it prints to stdout carries a `status` field, and its
+/// stderr line ends in `(HTTP 403)`.
+fn parse_error_status(body: &str, stderr: &str) -> Option<u16> {
+    if let Ok(value) = serde_json::from_str::<Value>(body.trim())
+        && let Some(status) = value.get("status")
+    {
+        // GitHub renders it as a string; be liberal about which.
+        let parsed = status
+            .as_str()
+            .and_then(|status| status.parse::<u16>().ok())
+            .or_else(|| {
+                status
+                    .as_u64()
+                    .and_then(|status| u16::try_from(status).ok())
+            });
+        if let Some(status) = parsed {
+            return Some(status);
+        }
+    }
+
+    // `gh: Upgrade to GitHub Pro ... (HTTP 403)`
+    let marker = stderr.rfind("(HTTP ")?;
+    let rest = &stderr[marker + "(HTTP ".len()..];
+    let end = rest.find(')')?;
+    rest[..end].trim().parse().ok()
 }
 
 /// Split a `gh api --include` response into status, headers and body.
@@ -338,6 +381,33 @@ mod tests {
         assert_eq!(status, 200);
         assert_eq!(headers, vec![("x-trace".to_string(), "2".to_string())]);
         assert_eq!(body, "{}");
+    }
+
+    #[test]
+    fn recovers_the_status_from_a_failed_paginated_request() {
+        // A paginated request has no status line, so without this every HTTP
+        // error on a collection endpoint reads as an authentication problem.
+        let body = r#"{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}"#;
+        assert_eq!(parse_error_status(body, ""), Some(403));
+    }
+
+    #[test]
+    fn recovers_the_status_from_stderr_when_the_body_has_none() {
+        let stderr = "gh: Not Found (HTTP 404)";
+        assert_eq!(parse_error_status("", stderr), Some(404));
+    }
+
+    #[test]
+    fn accepts_a_numeric_status_field() {
+        assert_eq!(parse_error_status(r#"{"status":422}"#, ""), Some(422));
+    }
+
+    #[test]
+    fn reports_no_status_when_neither_source_has_one() {
+        // A genuine CLI failure — bad flags, no network — must stay a CLI
+        // error rather than being dressed up as an API rejection.
+        assert_eq!(parse_error_status("", "gh: command not found"), None);
+        assert_eq!(parse_error_status("not json", ""), None);
     }
 
     #[test]
