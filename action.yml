@@ -1,0 +1,194 @@
+name: gh-settings
+description: Manage GitHub repository settings declaratively from .github/settings.yml
+
+branding:
+  icon: sliders
+  color: purple
+
+inputs:
+  command:
+    description: |
+      What to run: sync, plan, validate, export or doctor.
+      `plan` reports drift without changing anything and sets `changed`.
+    default: sync
+  token:
+    description: |
+      Token used to talk to GitHub.
+
+      The default is the workflow's own GITHUB_TOKEN, which is enough for
+      `validate` and for labels — and nothing else. Repository settings,
+      topics, autolinks and rulesets need `Administration: write`, which
+      the workflow `permissions:` block cannot grant at all, because it has
+      no `administration` key. For those, supply a personal access token or
+      a GitHub App installation token.
+
+      Run this action with `command: doctor` to see what a token can manage.
+      See https://noirbizarre.github.io/gh-settings/authentication/
+    default: ${{ github.token }}
+  repository:
+    description: Repository to act on, as owner/repo.
+    default: ${{ github.repository }}
+  config:
+    description: Path to the configuration file. Defaults to .github/settings.yml.
+  only:
+    description: Limit the run to specific resources, comma separated (e.g. labels,topics).
+  prune:
+    description: |
+      Delete items present on GitHub but absent from the configuration.
+      Overrides the file in both directions; leave unset to honour it.
+    default: ""
+  dry_run:
+    description: Show what sync would do without changing anything.
+    default: "false"
+  verbose:
+    description: Include field-level detail in the plan and the job summary.
+    default: "false"
+  version:
+    description: |
+      Version of the extension to install, e.g. `0.1.0`.
+      Defaults to the latest release. Pin it for reproducible workflows.
+    default: latest
+  summary:
+    description: Write the plan to the job summary.
+    default: "true"
+
+outputs:
+  changed:
+    description: |
+      `true` when the repository differs from the configuration.
+
+      For `plan` this comes from exit code 2, which is drift rather than
+      failure. For `sync` it reflects whether anything was actually applied.
+    value: ${{ steps.run.outputs.changed }}
+  counts:
+    description: JSON object of create/update/delete/recreate counts.
+    value: ${{ steps.run.outputs.counts }}
+  json:
+    description: The full JSON output of the command.
+    value: ${{ steps.run.outputs.json }}
+  success:
+    description: Whether every change applied cleanly. `sync` only.
+    value: ${{ steps.run.outputs.success }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install gh-settings
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        if [ "$VERSION" = "latest" ]; then
+          gh extension install noirbizarre/gh-settings --force
+        else
+          gh extension install "noirbizarre/gh-settings@${VERSION}" --force
+        fi
+        gh settings --version
+
+    - name: Run gh-settings
+      id: run
+      shell: bash
+      env:
+        # The binary never reads GH_TOKEN itself; authentication is delegated
+        # to `gh`, so the token has to be in *its* environment.
+        GH_TOKEN: ${{ inputs.token }}
+        COMMAND: ${{ inputs.command }}
+        REPOSITORY: ${{ inputs.repository }}
+        CONFIG: ${{ inputs.config }}
+        ONLY: ${{ inputs.only }}
+        PRUNE: ${{ inputs.prune }}
+        DRY_RUN: ${{ inputs.dry_run }}
+        VERBOSE: ${{ inputs.verbose }}
+        SUMMARY: ${{ inputs.summary }}
+      run: |
+        set -uo pipefail
+
+        args=("$COMMAND" "--repo" "$REPOSITORY" "--format" "json")
+        [ -n "$CONFIG" ] && args+=("--config" "$CONFIG")
+        [ -n "$ONLY" ] && args+=("--only" "$ONLY")
+        [ "$VERBOSE" = "true" ] && args+=("--verbose")
+
+        case "$PRUNE" in
+          true) args+=("--prune") ;;
+          false) args+=("--no-prune") ;;
+        esac
+
+        if [ "$COMMAND" = "sync" ]; then
+          args+=("--yes")
+          [ "$DRY_RUN" = "true" ] && args+=("--dry-run")
+        fi
+
+        # Capture stdout only: diagnostics, logs and progress all go to stderr
+        # precisely so stdout stays machine-readable.
+        set +e
+        output="$(gh settings "${args[@]}")"
+        status=$?
+        set -e
+
+        printf '%s\n' "$output"
+
+        # Exit 2 is drift, not failure — that distinction is the whole reason
+        # the code exists, and turning it into a red job would defeat it.
+        changed=false
+        if [ "$status" -eq 2 ]; then
+          changed=true
+          status=0
+        fi
+
+        # `sync` never exits 2, so for it "changed" comes from what was applied.
+        if [ "$COMMAND" = "sync" ] && [ -n "$output" ]; then
+          applied="$(printf '%s' "$output" | jq -r '[.applied // {} | to_entries[].value] | add // 0')"
+          [ "${applied:-0}" -gt 0 ] && changed=true
+          jq -r '"success=\(.success)"' <<<"$output" >> "$GITHUB_OUTPUT" || true
+        fi
+
+        echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+        if [ -n "$output" ]; then
+          counts="$(printf '%s' "$output" | jq -c '.counts // .applied // {}')"
+          echo "counts=$counts" >> "$GITHUB_OUTPUT"
+          # The JSON is pretty-printed and therefore multi-line, so it needs
+          # the heredoc form; a bare `key=value` would silently truncate.
+          {
+            echo "json<<GH_SETTINGS_JSON"
+            printf '%s\n' "$output"
+            echo "GH_SETTINGS_JSON"
+          } >> "$GITHUB_OUTPUT"
+        fi
+
+        if [ "$SUMMARY" = "true" ] && [ -n "$output" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          {
+            echo "## gh-settings"
+            echo
+            echo "\`$COMMAND\` on \`$REPOSITORY\`"
+            echo
+            if printf '%s' "$output" | jq -e '.changes | length > 0' >/dev/null 2>&1; then
+              echo "| | Resource | Change |"
+              echo "|---|---|---|"
+              printf '%s' "$output" | jq -r '
+                .changes[]
+                | (if .op == "create" then "➕"
+                   elif .op == "delete" then "➖"
+                   else "🔧" end) as $icon
+                | "| \($icon) | `\(.resource)` | \(.summary) |"'
+            elif printf '%s' "$output" | jq -e '(.failures // []) | length > 0' >/dev/null 2>&1; then
+              echo "| Resource | Item | Error |"
+              echo "|---|---|---|"
+              printf '%s' "$output" | jq -r '.failures[] | "| `\(.resource)` | `\(.key)` | \(.error) |"'
+            else
+              echo "Nothing to do — the repository matches the configuration."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        # A permissions failure is nearly always the token rather than the
+        # configuration, and the default token cannot manage most resources.
+        if [ "$status" -ne 0 ] && printf '%s' "$output" | jq -e \
+            '[(.failures // [])[] | select(.status == 403 or .status == 401)] | length > 0' \
+            >/dev/null 2>&1; then
+          echo "::error title=gh-settings::Some changes were refused for permission reasons. secrets.GITHUB_TOKEN cannot manage repository settings, topics, autolinks or rulesets — use a personal access token or a GitHub App token. Run this action with 'command: doctor' to see what your token can manage."
+        fi
+
+        exit "$status"

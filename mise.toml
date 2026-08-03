@@ -126,6 +126,7 @@ run = """
 cargo run --quiet -- schema | python3 scripts/gen-reference.py > docs/configuration.md
 cargo run --quiet -- internal cli > docs/cli.md
 cargo run --quiet -- internal requirements | python3 scripts/splice.py docs/authentication.md
+python3 scripts/gen-action-inputs.py | python3 scripts/splice.py docs/actions.md
 """
 
 [tasks."docs:check"]
@@ -134,7 +135,7 @@ description = "Fail if any generated document is out of date"
 # hand-written page that happens to be uncommitted, which is every docs commit.
 run = """
 mise run docs:reference
-git diff --exit-code --stat -- docs/configuration.md docs/cli.md docs/authentication.md schema/
+git diff --exit-code --stat -- docs/configuration.md docs/cli.md docs/authentication.md docs/actions.md schema/
 """
 
 [tasks.docs]

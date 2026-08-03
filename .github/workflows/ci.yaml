@@ -133,7 +133,7 @@ jobs:
         # Only the generated paths. Diffing all of docs/ would also flag
         # hand-written pages, which are not this job's business.
         run: |
-          if ! git diff --exit-code -- docs/configuration.md docs/cli.md docs/authentication.md schema/; then
+          if ! git diff --exit-code -- docs/configuration.md docs/cli.md docs/authentication.md docs/actions.md schema/; then
             echo "::error::Generated documentation is out of date. Run \`mise run docs:reference\` and commit the result."
             exit 1
           fi
@@ -170,6 +170,28 @@ jobs:
       # workflow and checks the names it will produce are ones `gh` can resolve.
       - name: Verify the release assets are resolvable by gh
         run: python3 scripts/check-release-assets.py
+
+  # The action is a wrapper around a released binary, so it cannot be tested
+  # by building this branch. What *can* be tested — and is the part that breaks
+  # — is its own logic: exit 2 becoming `changed`, the outputs, the job summary
+  # and the permission annotation. That logic is exercised against a stub.
+  action:
+    name: 🎬 Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the inputs table is current
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 scripts/gen-action-inputs.py > "$RUNNER_TEMP/inputs.md"
+          if ! grep -qF "$(sed -n '4p' "$RUNNER_TEMP/inputs.md")" docs/actions.md; then
+            echo "::error::docs/actions.md is out of date. Run \`mise run docs:reference\`."
+            exit 1
+          fi
+
+      - name: Exercise the action logic against a stub
+        run: bash scripts/test-action.sh
 
   # gh-ship releases gh-settings. Its configuration and workflows must satisfy
   # the contract gh-ship enforces, or the release breaks at the worst moment.

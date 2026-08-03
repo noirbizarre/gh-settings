@@ -237,6 +237,19 @@ Use a personal access token or a GitHub App installation token:
     GH_TOKEN: ${{ secrets.GH_SETTINGS_TOKEN }}   # NOT secrets.GITHUB_TOKEN
 ```
 
+In a workflow, use the action rather than wiring up the CLI by hand:
+
+```yaml
+- uses: actions/checkout@v5
+- uses: noirbizarre/gh-settings@v1
+  with:
+    token: ${{ secrets.GH_SETTINGS_TOKEN }}   # NOT secrets.GITHUB_TOKEN
+```
+
+`command: plan` reports drift through a `changed` output instead of failing the
+job, and writes the plan to the job summary. See
+[docs/actions.md](docs/actions.md).
+
 Run `gh settings doctor` to see what your current credential can manage:
 
 ```console

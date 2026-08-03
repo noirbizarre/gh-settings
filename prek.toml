@@ -68,7 +68,7 @@ pass_filenames = false
 id = "generated-docs"
 name = "generated documentation is up to date"
 language = "system"
-entry = "bash -c 'mise run docs:reference && git diff --exit-code -- docs/configuration.md docs/cli.md docs/authentication.md schema/'"
+entry = "bash -c 'mise run docs:reference && git diff --exit-code -- docs/configuration.md docs/cli.md docs/authentication.md docs/actions.md schema/'"
 files = "^(src/|schema/|docs/|scripts/)"
 pass_filenames = false
 

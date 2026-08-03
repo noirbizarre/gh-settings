@@ -82,17 +82,11 @@ reason stops applying.
 
 ### Features
 
-- [ ] **A composite action**, so automating this does not mean hand-writing
-      `gh extension install` in every repository. Composite rather than Docker:
-      nothing to build or publish, and it works on every runner architecture
-      including `windows-arm64`. Three things it must supply that the binary
-      deliberately does not: mapping **exit code 2** (drift) to a `changed`
-      output rather than a failure, Actions-native output (job summary, step
-      outputs) synthesised from `--format json`, and passing the token into the
-      environment of the `gh` call — the binary never reads `GH_TOKEN` itself.
-      Its token guidance has to repeat that `secrets.GITHUB_TOKEN` cannot manage
-      most resources; defaulting to `github.token` is convenient and wrong for
-      the common case.
+- [x] **A composite action** — `uses: noirbizarre/gh-settings@v1`. Maps exit
+      code 2 to a `changed` output rather than a failed job, writes the plan to
+      the job summary, and annotates a 403 with the token explanation. See
+      [GitHub Actions](actions.md).
+
 - [ ] **Inheritance (`extends:`)** — share labels, autolinks and rulesets across
       repositories. Decided: inherit from another repository, ref-pinnable
       (`acme/.github@v1`); merge collections by item identity with the child
