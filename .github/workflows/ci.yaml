@@ -163,6 +163,12 @@ jobs:
           ./target/release/gh-settings --version
           ./target/release/gh-settings schema > /dev/null
 
+      # Proving the local binary exists says nothing about the release assets,
+      # which is the part that actually breaks installs. This reads the publish
+      # workflow and checks the names it will produce are ones `gh` can resolve.
+      - name: Verify the release assets are resolvable by gh
+        run: python3 scripts/check-release-assets.py
+
   # gh-ship releases gh-settings. Its configuration and workflows must satisfy
   # the contract gh-ship enforces, or the release breaks at the worst moment.
   ship:

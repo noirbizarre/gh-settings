@@ -30,8 +30,15 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # gh extensions with precompiled binaries require assets named
-  # <os>-<arch>[.exe]. `gh extension install` picks the matching one.
+  # `gh extension install` computes `<os>-<arch>` for the running machine and
+  # picks the release asset whose name ends in it. A platform with no matching
+  # asset is not a degraded install, it is a hard failure — so every platform
+  # `gh` recognises needs a line here.
+  #
+  # `linux-amd64-musl` is the exception: `gh` has no musl platform string and
+  # can never select it. It is built as a manual download for people on distros
+  # without a compatible glibc, and is deliberately named so that it cannot
+  # shadow the gnu build.
   build:
     name: 🏗️ ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -45,6 +52,7 @@ jobs:
           - { target: x86_64-apple-darwin,        runner: macos-latest,   asset: darwin-amd64,  cross: false }
           - { target: aarch64-apple-darwin,       runner: macos-latest,   asset: darwin-arm64,  cross: false }
           - { target: x86_64-pc-windows-msvc,     runner: windows-latest, asset: windows-amd64, cross: false, ext: .exe }
+          - { target: aarch64-pc-windows-msvc,    runner: windows-11-arm, asset: windows-arm64, cross: false, ext: .exe }
     steps:
       - uses: actions/checkout@v7
         with:

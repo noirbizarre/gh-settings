@@ -71,3 +71,13 @@ language = "system"
 entry = "bash -c 'mise run docs:reference && git diff --exit-code -- docs/ schema/'"
 files = "^(src/|schema/|docs/|scripts/)"
 pass_filenames = false
+
+# A release asset `gh` cannot resolve makes the extension uninstallable on a
+# user's machine, long after CI is green (ADR-014). Cheap to check here.
+[[repos.hooks]]
+id = "release-assets"
+name = "release assets are resolvable by gh"
+language = "system"
+entry = "python3 scripts/check-release-assets.py"
+files = "^(\\.github/workflows/publish-release\\.yaml|scripts/check-release-assets\\.py)$"
+pass_filenames = false
