@@ -404,3 +404,65 @@ fn json_output_is_machine_readable() {
     assert_eq!(value["counts"]["create"], 1);
     assert_eq!(value["changes"][0]["resource"], "labels");
 }
+
+#[test]
+fn sync_emits_json_even_when_there_is_nothing_to_do() {
+    // Nothing to do is the *common* case for anything automated. This path used
+    // to print the human "up to date" line and return before reaching the JSON
+    // branch, so a consumer parsing stdout broke precisely when everything was
+    // fine — and nothing caught it, because the only JSON test covered `plan`.
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n    description: Something isn't working\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--format", "json"]);
+    output.expect_status(0);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout)
+        .unwrap_or_else(|error| panic!("stdout was not JSON: {error}\n{}", output.stdout));
+
+    assert_eq!(value["success"], true);
+    assert_eq!(value["applied"]["create"], 0);
+    assert_eq!(value["skipped"], 0);
+    assert_eq!(value["failures"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn sync_emits_json_after_applying_changes() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: feature\n    color: a2eeef\n")
+        .get("repos/o/r/labels", "[]")
+        .respond("POST", "repos/o/r/labels", Fixture::created("{}"))
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--format", "json"]);
+    output.expect_status(0);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["success"], true);
+    assert_eq!(value["applied"]["create"], 1);
+}
+
+#[test]
+fn sync_reports_failures_in_json() {
+    // An action needs the status code to distinguish "wrong token" from
+    // "wrong configuration".
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: feature\n    color: a2eeef\n")
+        .get("repos/o/r/labels", "[]")
+        .respond(
+            "POST",
+            "repos/o/r/labels",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--format", "json"]);
+    output.expect_status(1);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["success"], false);
+    assert_eq!(value["failures"][0]["resource"], "labels");
+    assert_eq!(value["failures"][0]["status"], 403);
+}

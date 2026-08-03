@@ -66,6 +66,17 @@ pub struct ApplyReport {
 }
 
 impl ApplyReport {
+    /// A report for a run that had nothing to do.
+    ///
+    /// Distinct from "no outcomes because we failed early": this is success
+    /// with an empty plan, and it exists so `--format json` can say so rather
+    /// than falling back to human output.
+    pub fn empty() -> Self {
+        Self {
+            outcomes: Vec::new(),
+        }
+    }
+
     /// Whether every change succeeded.
     pub fn is_success(&self) -> bool {
         !self.outcomes.iter().any(ApplyOutcome::is_failed)

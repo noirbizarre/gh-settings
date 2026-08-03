@@ -7,7 +7,10 @@ use serde::Serialize;
 
 use crate::config::Finding;
 use crate::engine::{ApplyReport, Plan};
-use crate::resources::Counts;
+use crate::github::AuthStatus;
+use crate::github::auth::Scopes;
+use crate::output::human::Capability;
+use crate::resources::{Counts, ResourceId};
 
 /// Renders plans and reports as JSON.
 #[derive(Debug, Clone, Copy, Default)]
@@ -66,7 +69,109 @@ pub struct FailureOutput {
     pub status: Option<u16>,
 }
 
+/// JSON form of a `doctor` run.
+#[derive(Debug, Serialize)]
+pub struct DoctorOutput<'a> {
+    /// Whether every checked resource is manageable with this credential.
+    pub ok: bool,
+    /// The `gh` version string, when `gh` was found.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gh_version: Option<&'a str>,
+    /// Authentication, when it could be determined.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authentication: Option<AuthOutput<'a>>,
+    /// Per-resource capability.
+    pub resources: Vec<ResourceCapabilityOutput>,
+}
+
+/// JSON form of the credential in use.
+#[derive(Debug, Serialize)]
+pub struct AuthOutput<'a> {
+    /// Host authenticated against.
+    pub hostname: &'a str,
+    /// Login, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<&'a str>,
+    /// Credential kind, e.g. `classic_pat`.
+    pub token_kind: &'static str,
+    /// Human label for the credential kind.
+    pub token_label: &'static str,
+    /// Granted scopes.
+    ///
+    /// `null` — not an empty list — when the credential does not report them,
+    /// which is the case for fine-grained and App tokens. The distinction
+    /// matters: "no scopes" and "we cannot tell" are different answers, and
+    /// conflating them is what ADR-015 exists to prevent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<&'a [String]>,
+    /// Whether the token holds admin rights on the target, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub admin_on_target: Option<bool>,
+}
+
+/// JSON form of one resource's capability.
+#[derive(Debug, Serialize)]
+pub struct ResourceCapabilityOutput {
+    /// Resource identifier.
+    pub resource: String,
+    /// `manageable`, `impossible` or `unknown`.
+    pub status: &'static str,
+    /// Why, when it is impossible.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
 impl JsonRenderer {
+    /// Render a `doctor` run.
+    pub fn doctor(
+        &self,
+        gh_version: Option<&str>,
+        auth: Option<&AuthStatus>,
+        capabilities: &[(ResourceId, Capability)],
+    ) -> String {
+        let resources: Vec<ResourceCapabilityOutput> = capabilities
+            .iter()
+            .map(|(id, capability)| ResourceCapabilityOutput {
+                resource: id.as_str().to_string(),
+                status: match capability {
+                    Capability::Manageable => "manageable",
+                    Capability::Impossible(_) => "impossible",
+                    Capability::Unknown => "unknown",
+                },
+                reason: match capability {
+                    Capability::Impossible(reason) => Some((*reason).to_string()),
+                    _ => None,
+                },
+            })
+            .collect();
+
+        let output = DoctorOutput {
+            // Unknown is not a failure: a fine-grained token cannot report its
+            // scopes, and refusing to proceed on that basis would be guessing.
+            ok: gh_version.is_some()
+                && auth.is_some()
+                && !capabilities
+                    .iter()
+                    .any(|(_, capability)| matches!(capability, Capability::Impossible(_))),
+            gh_version,
+            authentication: auth.map(|auth| AuthOutput {
+                hostname: &auth.hostname,
+                account: auth.account.as_deref(),
+                token_kind: token_kind_key(auth),
+                token_label: auth.token_kind.label(),
+                scopes: match &auth.scopes {
+                    Scopes::Known(scopes) => Some(scopes.as_slice()),
+                    Scopes::Unknown => None,
+                },
+                admin_on_target: auth.admin_on_target,
+            }),
+            resources,
+        };
+
+        serde_json::to_string_pretty(&output)
+            .unwrap_or_else(|error| panic!("a doctor report should always serialise: {error}"))
+    }
+
     /// Render a plan.
     pub fn plan(&self, plan: &Plan) -> String {
         serde_json::to_string_pretty(&plan.to_artifact())
@@ -114,6 +219,21 @@ impl JsonRenderer {
         };
         serde_json::to_string_pretty(&output)
             .unwrap_or_else(|error| panic!("a report should always serialise: {error}"))
+    }
+}
+
+/// Stable machine-readable key for a credential kind.
+///
+/// Separate from the human label, which is prose and may be reworded.
+fn token_kind_key(auth: &AuthStatus) -> &'static str {
+    use crate::github::TokenKind;
+    match auth.token_kind {
+        TokenKind::OAuth => "oauth",
+        TokenKind::ClassicPat => "classic_pat",
+        TokenKind::FineGrainedPat => "fine_grained_pat",
+        TokenKind::AppInstallation => "app_installation",
+        TokenKind::ActionsGitHubToken => "actions_github_token",
+        TokenKind::Unknown => "unknown",
     }
 }
 

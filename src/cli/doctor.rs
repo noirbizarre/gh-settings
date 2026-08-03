@@ -33,11 +33,19 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
 
     let capabilities = capabilities(ctx, auth_status.as_ref());
 
-    println!(
-        "{}",
-        ctx.human
-            .doctor(gh_version.as_deref(), auth_status.as_ref(), &capabilities)
-    );
+    if ctx.args.is_json() {
+        println!(
+            "{}",
+            ctx.json
+                .doctor(gh_version.as_deref(), auth_status.as_ref(), &capabilities)
+        );
+    } else {
+        println!(
+            "{}",
+            ctx.human
+                .doctor(gh_version.as_deref(), auth_status.as_ref(), &capabilities)
+        );
+    }
 
     let blocked = gh_version.is_none()
         || auth_status.is_none()

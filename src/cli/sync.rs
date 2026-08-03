@@ -8,7 +8,7 @@ use miette::Result;
 
 use crate::cli::context::Context;
 use crate::cli::exit;
-use crate::engine::apply::ApplyOptions;
+use crate::engine::apply::{ApplyOptions, ApplyReport};
 use crate::engine::plan::{ArtifactError, PlanArtifact};
 
 /// Arguments for `sync`.
@@ -60,7 +60,14 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     };
 
     if plan.is_empty() {
-        print!("{}", ctx.human.plan(&plan));
+        // Nothing to do is the *common* case for anything automated, so this
+        // path must still honour `--format json`. Emitting human text here left
+        // a consumer parsing stdout broken precisely when everything was fine.
+        if ctx.args.is_json() {
+            println!("{}", ctx.json.apply(&ApplyReport::empty()));
+        } else {
+            print!("{}", ctx.human.plan(&plan));
+        }
         return Ok(exit::SUCCESS);
     }
 

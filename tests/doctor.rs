@@ -203,3 +203,78 @@ fn an_app_installation_token_outside_actions_is_not_restricted() {
         output.stdout
     );
 }
+
+#[test]
+fn doctor_emits_json() {
+    let runner = sandbox("ghp_x", Some("repo, read:org")).build();
+    let output = runner.run(&["doctor", "-R", "o/r", "--format", "json"]);
+    output.expect_status(0);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout)
+        .unwrap_or_else(|error| panic!("stdout was not JSON: {error}\n{}", output.stdout));
+
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["authentication"]["token_kind"], "classic_pat");
+    assert_eq!(value["authentication"]["account"], "tester");
+
+    let resources = value["resources"].as_array().expect("resources");
+    assert_eq!(resources.len(), 5);
+    assert!(
+        resources
+            .iter()
+            .all(|resource| resource["status"] == "manageable")
+    );
+}
+
+#[test]
+fn doctor_json_distinguishes_no_scopes_from_unknown_scopes() {
+    // A fine-grained token cannot report its scopes. Emitting an empty list
+    // would say "this token has no permissions", which is a different and
+    // wrong answer. The field is omitted instead.
+    let runner = sandbox("github_pat_x", None).build();
+    let output = runner.run(&["doctor", "-R", "o/r", "--format", "json"]);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["authentication"]["token_kind"], "fine_grained_pat");
+    assert!(
+        value["authentication"].get("scopes").is_none(),
+        "unknown scopes must be absent, not an empty list: {}",
+        output.stdout
+    );
+}
+
+#[test]
+fn doctor_json_reports_the_actions_token_as_impossible() {
+    let runner = sandbox("ghs_actionstoken", Some("issues")).build();
+    let output = runner.run_with_env(
+        &["doctor", "-R", "o/r", "--format", "json"],
+        &[("GITHUB_ACTIONS", "true")],
+    );
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["ok"], false);
+    assert_eq!(
+        value["authentication"]["token_kind"],
+        "actions_github_token"
+    );
+
+    let resources = value["resources"].as_array().unwrap();
+    let repository = resources
+        .iter()
+        .find(|resource| resource["resource"] == "repository")
+        .expect("repository");
+    assert_eq!(repository["status"], "impossible");
+    assert!(
+        repository["reason"]
+            .as_str()
+            .unwrap()
+            .contains("cannot be granted"),
+        "{repository}"
+    );
+
+    let labels = resources
+        .iter()
+        .find(|resource| resource["resource"] == "labels")
+        .expect("labels");
+    assert_eq!(labels["status"], "manageable");
+}
