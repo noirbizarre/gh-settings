@@ -21,6 +21,7 @@ nav = [
   { "Guides" = [
     { "Authentication" = "authentication.md" },
     { "Configuration" = "configuration.md" },
+    { "CLI Reference" = "cli.md" },
   ] },
   { "About" = [
     { "Architecture Decisions" = "adr/README.md" },

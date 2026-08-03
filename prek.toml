@@ -60,12 +60,14 @@ entry = "cargo clippy --all-targets --all-features -- -D warnings"
 files = "\\.rs$"
 pass_filenames = false
 
-# The published JSON Schema is a public contract (ADR-007). Regenerating it is
-# cheap, and a stale copy silently breaks editor completion for every user.
+# Documentation generated from the code: the JSON Schema (a public contract,
+# ADR-007), the CLI reference, and the per-resource permission table (ADR-015).
+# A stale copy silently misleads — the permission table once claimed to be
+# generated while being hand-maintained, which is exactly what this prevents.
 [[repos.hooks]]
-id = "schema"
-name = "JSON Schema is up to date"
+id = "generated-docs"
+name = "generated documentation is up to date"
 language = "system"
-entry = "bash -c 'cargo run --quiet -- schema | diff -u schema/v1/settings.json -'"
-files = "^(src/config/|src/resources/|src/schema/|schema/)"
+entry = "bash -c 'mise run docs:reference && git diff --exit-code -- docs/ schema/'"
+files = "^(src/|schema/|docs/|scripts/)"
 pass_filenames = false

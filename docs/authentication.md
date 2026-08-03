@@ -136,9 +136,12 @@ Classic tokens *do* report their scopes, so `doctor` can be exact about them.
 
 ## Per-resource requirements
 
-These are declared in the code, on each resource, and this table is generated
-from that same declaration — so it cannot drift from what the tool actually
-enforces.
+Each resource declares its own requirements in code. The table below is
+generated from those declarations by `gh settings internal requirements`, and CI
+fails if the committed copy is stale — so it cannot drift from what the tool
+actually enforces.
+
+<!-- generated: do not edit below -->
 
 | Resource | Fine-grained | Classic | Works with `GITHUB_TOKEN` |
 |---|---|---|---|
@@ -147,6 +150,10 @@ enforces.
 | `labels` | Metadata: read, Issues: write | `repo` | ✔ |
 | `autolinks` | Metadata: read, Administration: write | `repo` | ✘ |
 | `rulesets` | Metadata: read, Administration: write | `repo` | ✘ |
+
+`repository`, `topics`, `autolinks` and `rulesets` require `Administration: write`, which **cannot be granted** to the Actions `GITHUB_TOKEN` — the workflow `permissions:` block has no `administration` key. Use a personal access token or a GitHub App token.
+
+<!-- /generated -->
 
 ---
 

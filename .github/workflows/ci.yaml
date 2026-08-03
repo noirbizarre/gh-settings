@@ -109,22 +109,30 @@ jobs:
       - name: Check
         run: cargo check --all-targets
 
-  # The configuration schema is a published contract: users reference it by URL
-  # from every settings file, and editors fetch it for completion. A change to a
-  # configuration type that does not regenerate it silently breaks both.
+  # Three documents are produced from the code and committed: the JSON Schema
+  # (a published contract users reference by URL), the CLI reference, and the
+  # per-resource permission table. A stale copy misleads silently — the
+  # permission table once *claimed* to be generated while being hand-written,
+  # which is precisely what this job now prevents.
   schema:
-    name: 📐 Schema
+    name: 📐 Generated docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.18
+          cache: true
 
-      - name: Check the committed schema is up to date
+      - name: Regenerate everything derived from the code
+        run: mise run docs:reference
+
+      - name: Check the committed copies are up to date
         run: |
-          cargo run --quiet -- schema > "$RUNNER_TEMP/settings.json"
-          if ! diff -u schema/v1/settings.json "$RUNNER_TEMP/settings.json"; then
-            echo "::error::The JSON Schema is out of date. Run \`mise run schema\` and commit the result."
+          if ! git diff --exit-code -- docs/ schema/; then
+            echo "::error::Generated documentation is out of date. Run \`mise run docs:reference\` and commit the result."
             exit 1
           fi
 

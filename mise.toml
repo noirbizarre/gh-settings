@@ -109,8 +109,23 @@ run = "gh ship validate"
 # --- Documentation ----------------------------------------------------------
 
 [tasks."docs:reference"]
-description = "Regenerate the configuration reference from the JSON Schema"
-run = "cargo run --quiet -- schema | python3 scripts/gen-reference.py > docs/configuration.md"
+description = "Regenerate every document derived from the code"
+# The configuration reference comes from the JSON Schema, which itself comes
+# from the Rust types; the CLI reference and the permission table come straight
+# from the code. All three are committed and checked in CI, so documentation
+# that describes the code cannot drift from it.
+run = """
+cargo run --quiet -- schema | python3 scripts/gen-reference.py > docs/configuration.md
+cargo run --quiet -- internal cli > docs/cli.md
+cargo run --quiet -- internal requirements | python3 scripts/splice.py docs/authentication.md
+"""
+
+[tasks."docs:check"]
+description = "Fail if any generated document is out of date"
+run = """
+mise run docs:reference
+git diff --exit-code --stat -- docs/ schema/
+"""
 
 [tasks.docs]
 description = "Serve the documentation locally"

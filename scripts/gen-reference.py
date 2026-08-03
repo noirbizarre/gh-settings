@@ -178,7 +178,10 @@ def main() -> int:
             if items.get("properties"):
                 out.extend(render_object(f"{name}.{key}[]", items, root, level=3))
 
-    print("\n".join(out))
+    # Exactly one trailing newline. Emitting two would put this generator in a
+    # fight with prek's end-of-file-fixer, and the "is the committed copy
+    # current?" check would never converge.
+    sys.stdout.write("\n".join(out).rstrip("\n") + "\n")
     return 0
 
 

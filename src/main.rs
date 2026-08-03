@@ -27,6 +27,10 @@ async fn run(cli: Cli) -> miette::Result<i32> {
         // repository, so they work in a pull request CI job with no credentials.
         Command::Schema(args) => gh_settings::cli::schema::run(args),
 
+        // Documentation generators. Like `schema`, they need no network and no
+        // repository, so they run in any CI job.
+        Command::Internal(args) => gh_settings::cli::internal::run(args),
+
         Command::Validate(args) => {
             let ctx = Context::new(cli.global.clone(), true).await?;
             let config = ctx.load_config()?;

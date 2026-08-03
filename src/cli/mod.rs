@@ -7,6 +7,7 @@
 pub mod context;
 pub mod doctor;
 pub mod export;
+pub mod internal;
 pub mod plan;
 pub mod schema;
 pub mod sync;
@@ -160,6 +161,14 @@ pub enum Command {
 
     /// Print the JSON Schema for the configuration file.
     Schema(schema::Args),
+
+    /// Generate documentation from the code.
+    ///
+    /// Hidden: these are build-time tools, not product surface. They exist so
+    /// that documentation describing the code is produced *by* the code and
+    /// cannot drift from it.
+    #[command(hide = true)]
+    Internal(internal::Args),
 }
 
 #[cfg(test)]
