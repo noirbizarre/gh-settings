@@ -123,6 +123,83 @@ fn reports_changed_rules_individually() {
 }
 
 #[test]
+fn server_defaulted_rule_parameters_do_not_diff() {
+    // Verified against the real API: creating a `pull_request` rule with five
+    // parameters returns seven — GitHub adds `required_reviewers` and
+    // `allowed_merge_methods`. Comparing the objects wholesale reported an
+    // update on every single run, which is the permanent diff ADR-002 exists to
+    // prevent, and it made rulesets non-idempotent.
+    let desired = Ruleset::new("main-protection").with_rules(vec![Rule::with(
+        "pull_request",
+        json!({
+            "required_approving_review_count": 1,
+            "dismiss_stale_reviews_on_push": false,
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": false,
+        }),
+    )]);
+
+    let as_github_returns_it = Ruleset::new("main-protection").with_rules(vec![Rule::with(
+        "pull_request",
+        json!({
+            "required_approving_review_count": 1,
+            "dismiss_stale_reviews_on_push": false,
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": false,
+            // Defaulted by the server; never written by the user.
+            "required_reviewers": [],
+            "allowed_merge_methods": ["merge", "squash", "rebase"],
+        }),
+    )]);
+
+    let changes = plan(vec![desired], vec![(1, as_github_returns_it)], false);
+    assert!(changes.is_empty(), "{changes:#?}");
+}
+
+#[test]
+fn a_declared_parameter_that_changed_still_diffs() {
+    // The subset comparison must not blind us to a real change.
+    let desired = Ruleset::new("r").with_rules(vec![Rule::with(
+        "pull_request",
+        json!({"required_approving_review_count": 2}),
+    )]);
+    let current = Ruleset::new("r").with_rules(vec![Rule::with(
+        "pull_request",
+        json!({"required_approving_review_count": 1, "allowed_merge_methods": ["merge"]}),
+    )]);
+
+    let changes = plan(vec![desired], vec![(1, current)], false);
+    assert_eq!(changes.len(), 1, "{changes:#?}");
+    assert_eq!(changes[0].op, Op::Update);
+}
+
+#[test]
+fn declaring_a_parameter_the_server_omits_diffs() {
+    let desired = Ruleset::new("r").with_rules(vec![Rule::with(
+        "pull_request",
+        json!({"required_approving_review_count": 1}),
+    )]);
+    let current = Ruleset::new("r").with_rules(vec![Rule::new("pull_request")]);
+
+    assert_eq!(plan(vec![desired], vec![(1, current)], false).len(), 1);
+}
+
+#[test]
+fn a_rule_with_no_declared_parameters_never_diffs_on_defaults() {
+    // `- type: non_fast_forward` takes no parameters, but a future GitHub
+    // release adding one must not make every repository dirty.
+    let desired = Ruleset::new("r").with_rules(vec![Rule::new("non_fast_forward")]);
+    let current = Ruleset::new("r").with_rules(vec![Rule::with(
+        "non_fast_forward",
+        json!({"some_future_parameter": true}),
+    )]);
+
+    assert!(plan(vec![desired], vec![(1, current)], false).is_empty());
+}
+
+#[test]
 fn an_enforcement_change_is_reported() {
     let desired = protection().with_enforcement(Enforcement::Disabled);
     let changes = plan(vec![desired], vec![(1, protection())], false);

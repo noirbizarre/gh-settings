@@ -674,7 +674,12 @@ impl Ruleset {
                     format!("rule {}", rule.rule_type),
                     render_parameters(rule.parameters.as_ref()),
                 )),
-                Some(existing) if existing.parameters != rule.parameters => {
+                Some(existing)
+                    if parameters_differ(
+                        rule.parameters.as_ref(),
+                        existing.parameters.as_ref(),
+                    ) =>
+                {
                     fields.push(FieldDiff::changed(
                         format!("rule {}", rule.rule_type),
                         render_parameters(existing.parameters.as_ref()),
@@ -696,6 +701,32 @@ impl Ruleset {
 
         let _ = current_types;
         fields
+    }
+}
+
+/// Whether a rule's declared parameters differ from what GitHub reports.
+///
+/// GitHub fills in defaults the user never wrote: creating a `pull_request`
+/// rule with five parameters returns seven, having added `required_reviewers`
+/// and `allowed_merge_methods`. Comparing the objects wholesale therefore
+/// reports a change on every run, for ever — the permanent diff ADR-002 exists
+/// to prevent.
+///
+/// So only the keys the configuration actually declares are compared. A
+/// parameter the user did not write is unmanaged, exactly as an omitted field
+/// is everywhere else in this tool: we neither diff it nor reset it.
+fn parameters_differ(desired: Option<&Value>, current: Option<&Value>) -> bool {
+    match (desired, current) {
+        // Nothing declared is nothing managed, whatever the server defaulted.
+        (None, _) => false,
+        (Some(_), None) => true,
+        (Some(desired), Some(current)) => match (desired.as_object(), current.as_object()) {
+            (Some(desired), Some(current)) => desired
+                .iter()
+                .any(|(key, value)| current.get(key) != Some(value)),
+            // Not both objects: fall back to whole-value comparison.
+            _ => desired != current,
+        },
     }
 }
 
