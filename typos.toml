@@ -5,6 +5,11 @@
 extend-exclude = [
   "Cargo.lock",
   "mise.lock",
+  # Generated. Its prose is commit subjects, already spell-checked at
+  # generation time by cliff.toml's `typos --write-changes -` preprocessor,
+  # while the per-commit links embed hex SHAs that read as typos: a short SHA
+  # containing "abd" or "ba" would fail CI at release time.
+  "CHANGELOG.md",
   # Snapshots echo back the deliberate typos below, inside rendered diagnostics.
   "tests/snapshots/**",
   "site/**",

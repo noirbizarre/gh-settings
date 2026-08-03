@@ -102,6 +102,17 @@ commit_preprocessors = [
   # Fix typos in commit messages, which cannot be amended once pushed.
   # https://github.com/crate-ci/typos
   { pattern = ".*", replace_command = "typos --write-changes -" },
+  # Neutralise HTML comment delimiters. These notes end up inside the
+  # `<!-- ship:artifact ... -->` block gh-ship embeds in the Release PR body,
+  # and HTML comments cannot nest: a `-->` reaching them closes the block
+  # early. gh-ship escapes the payload too, but a subject that cannot produce
+  # a delimiter in the first place is the cheaper guarantee, and the entities
+  # render as the original literal text.
+  #
+  # This belongs in the *pre*processors: postprocessors run on rendered output
+  # and would mangle the `<!-- 0 -->` group-ordering markers in the template.
+  { pattern = '<!--', replace = "&lt;!--" },
+  { pattern = '-->', replace = "--&gt;" },
 ]
 
 commit_parsers = [
