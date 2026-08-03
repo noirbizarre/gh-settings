@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::config::Finding;
-use crate::github::{GitHubClient, GitHubClientExt, Request, Result as GitHubResult};
+use crate::github::{GitHubClient, Resolver, Result as GitHubResult};
 use crate::resources::{FieldDiff, ValidateCtx};
 
 /// What a ruleset applies to.
@@ -184,8 +184,7 @@ impl BypassActor {
         &mut self,
         client: &dyn GitHubClient,
         owner: &str,
-        teams: &mut HashMap<String, u64>,
-        apps: &mut HashMap<String, u64>,
+        resolver: &Resolver,
     ) -> GitHubResult<()> {
         if !self.needs_resolution() {
             // `organization_admin` has a fixed identifier and needs no lookup.
@@ -197,45 +196,13 @@ impl BypassActor {
         }
 
         if let Some(slug) = self.team.clone() {
-            let id = match teams.get(&slug) {
-                Some(id) => *id,
-                None => {
-                    let team: Option<IdOnly> = client
-                        .send_optional(Request::get(format!("orgs/{owner}/teams/{slug}")))
-                        .await?;
-                    let id = team
-                        .ok_or_else(|| crate::github::GitHubError::UnresolvedActor {
-                            kind: "team",
-                            slug: slug.clone(),
-                        })?
-                        .id;
-                    teams.insert(slug.clone(), id);
-                    id
-                }
-            };
-            self.actor_id = Some(id);
+            self.actor_id = Some(resolver.team(client, owner, &slug).await?);
             self.actor_type = Some("Team".into());
             return Ok(());
         }
 
         if let Some(slug) = self.app.clone() {
-            let id = match apps.get(&slug) {
-                Some(id) => *id,
-                None => {
-                    let app: Option<IdOnly> = client
-                        .send_optional(Request::get(format!("apps/{slug}")))
-                        .await?;
-                    let id = app
-                        .ok_or_else(|| crate::github::GitHubError::UnresolvedActor {
-                            kind: "app",
-                            slug: slug.clone(),
-                        })?
-                        .id;
-                    apps.insert(slug.clone(), id);
-                    id
-                }
-            };
-            self.actor_id = Some(id);
+            self.actor_id = Some(resolver.app(client, &slug).await?);
             self.actor_type = Some("Integration".into());
         }
 
@@ -308,11 +275,6 @@ impl BypassActor {
             self.bypass_mode.as_str(),
         )
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct IdOnly {
-    id: u64,
 }
 
 /// Which refs a ruleset applies to.

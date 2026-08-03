@@ -30,7 +30,9 @@ use serde_json::{Map, Value, json};
 
 use crate::config::{Finding, Prunable, Settings};
 use crate::diff::diff_keyed;
-use crate::github::{GitHubClient, GitHubClientExt, Request, Result as GitHubResult, Target};
+use crate::github::{
+    GitHubClient, GitHubClientExt, Request, Resolver, Result as GitHubResult, Target,
+};
 use crate::resources::{
     Change, FieldDiff, Op, PruneOpts, Requirement, Resource, ResourceId, ValidateCtx,
 };
@@ -132,14 +134,14 @@ impl Resource for Rulesets {
             return Ok(desired);
         }
 
-        let mut teams: HashMap<String, u64> = HashMap::new();
-        let mut apps: HashMap<String, u64> = HashMap::new();
+        // One resolver for the whole run: a fleet of rulesets almost always
+        // names the same handful of teams, and each mention would otherwise be
+        // a round trip.
+        let resolver = Resolver::new();
 
         for ruleset in &mut desired.rulesets {
             for actor in &mut ruleset.bypass_actors {
-                actor
-                    .resolve(client, &target.owner, &mut teams, &mut apps)
-                    .await?;
+                actor.resolve(client, &target.owner, &resolver).await?;
             }
         }
 

@@ -135,10 +135,6 @@ reason stops applying.
       executed inside the privileged `release` environment, while every other
       tool is pinned through `mise.lock`. The inconsistency, not the trust, is
       the problem.
-- [ ] **`github/resolver.rs` is dead code.** Rulesets re-implement its caching
-      inline. Either use it in `Resource::prepare()`, which is where it belongs,
-      or delete it — an orphaned port that the ADRs describe as load-bearing is
-      worse than neither.
 - [ ] Harden `${{ inputs.tag }}` interpolation in `publish-release.yaml` by
       passing through `env:`. Only reachable by someone who already has write
       access, so defence in depth rather than a hole.

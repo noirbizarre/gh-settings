@@ -466,3 +466,53 @@ fn sync_reports_failures_in_json() {
     assert_eq!(value["failures"][0]["resource"], "labels");
     assert_eq!(value["failures"][0]["status"], 403);
 }
+
+#[test]
+fn an_unresolvable_bypass_team_fails_the_plan_and_writes_nothing() {
+    // The whole reason resolution happens during `prepare` rather than lazily
+    // during apply: a misspelled team is caught while planning, so nothing has
+    // been written yet. Resolving mid-apply would abort with some rulesets
+    // already created and some not.
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nrulesets:\n  - name: main\n    bypass_actors:\n      - team: nonexistent\n    rules:\n      - type: non_fast_forward\n",
+        )
+        .respond(
+            "GET",
+            "orgs/o/teams/nonexistent",
+            Fixture::error(404, "Not Found"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(1);
+
+    assert!(
+        output.stderr.contains("nonexistent"),
+        "the error must name the slug: {}",
+        output.stderr
+    );
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+}
+
+#[test]
+fn a_bypass_team_is_looked_up_once_however_often_it_is_named() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nrulesets:\n  - name: one\n    bypass_actors:\n      - team: eng\n    rules:\n      - type: non_fast_forward\n  - name: two\n    bypass_actors:\n      - team: eng\n    rules:\n      - type: non_fast_forward\n",
+        )
+        .get("orgs/o/teams/eng", r#"{"id": 42}"#)
+        .get("repos/o/r/rulesets", "[]")
+        .respond("POST", "repos/o/r/rulesets", Fixture::created("{}"))
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let lookups = output
+        .requests
+        .iter()
+        .filter(|request| request.contains("orgs/o/teams/eng"))
+        .count();
+    assert_eq!(lookups, 1, "{:?}", output.requests);
+}
