@@ -122,9 +122,11 @@ cargo run --quiet -- internal requirements | python3 scripts/splice.py docs/auth
 
 [tasks."docs:check"]
 description = "Fail if any generated document is out of date"
+# Only the generated paths: checking all of docs/ would fail on any
+# hand-written page that happens to be uncommitted, which is every docs commit.
 run = """
 mise run docs:reference
-git diff --exit-code --stat -- docs/ schema/
+git diff --exit-code --stat -- docs/configuration.md docs/cli.md docs/authentication.md schema/
 """
 
 [tasks.docs]

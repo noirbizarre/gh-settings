@@ -41,10 +41,19 @@ reason stops applying.
 
 ### Verification
 
-- [ ] **Ruleset apply-path tests.** Rulesets are the most intricate resource and
-      have **zero** integration coverage of create/update/delete, and have never
-      run against the real API. Any payload-shape bug surfaces as a bare `422`
-      that does not say which field is wrong.
+- [ ] **A live test suite** against a real throwaway repository, `#[ignore]`d and
+      gated on `GH_SETTINGS_TEST_REPO`, exercising each resource's create →
+      update → prune cycle. The stub asserts the shape of the requests we
+      *send*; only a real run asserts that GitHub accepts them, or shows what it
+      sends back. The first manual run against the API found two bugs the entire
+      stub suite could not see — a permanent diff caused by server-defaulted
+      ruleset parameters, and every HTTP error on a paginated endpoint being
+      reported as an authentication failure. It must refuse to run against a
+      repository that already has configuration, so it can never eat real
+      settings.
+- [ ] **Ruleset apply-path tests through the stub.** Create, update, delete and
+      prune, asserting the request log. Manually verified against the real API
+      once; nothing yet stops a regression.
 - [ ] **Repository security PATCH test.** The `security_and_analysis`
       sub-object travels in its own request with a `{status: …}` shape, and that
       split is untested end to end.
@@ -67,6 +76,45 @@ reason stops applying.
       so the real error can speak.
 - [ ] **Attach the requirement table to a `403`**, rather than the current
       generic "run `doctor`" hint.
+- [ ] **Help with ruleset rule parameters.** GitHub requires *all* parameters of
+      a rule, not the subset you want to change: a `pull_request` rule missing
+      one field is rejected with `Invalid property /rules/1: data matches no
+      possible input`, which names neither the rule nor the field. Validation
+      could name the rule from the index, and list the parameters a known rule
+      type expects.
+
+### Features
+
+- [ ] **A composite action**, so automating this does not mean hand-writing
+      `gh extension install` in every repository. Composite rather than Docker:
+      nothing to build or publish, and it works on every runner architecture
+      including `windows-arm64`. Three things it must supply that the binary
+      deliberately does not: mapping **exit code 2** (drift) to a `changed`
+      output rather than a failure, Actions-native output (job summary, step
+      outputs) synthesised from `--format json`, and passing the token into the
+      environment of the `gh` call — the binary never reads `GH_TOKEN` itself.
+      Its token guidance has to repeat that `secrets.GITHUB_TOKEN` cannot manage
+      most resources; defaulting to `github.token` is convenient and wrong for
+      the common case.
+- [ ] **Inheritance (`extends:`)** — share labels, autolinks and rulesets across
+      repositories. Decided: inherit from another repository, ref-pinnable
+      (`acme/.github@v1`); merge collections by item identity with the child
+      overriding field by field; **`prune` never inherits**, because otherwise
+      editing one shared file would start deleting across every repository that
+      extends it, decided by someone who does not own them.
+
+      The load-bearing risk is not the merge, it is the diagnostics. A
+      `SourceSpan` is a byte offset with no file identity, so an offset from the
+      base file is still a *valid* index into the local one: a finding about the
+      shared file would render a confident underline pointing at unrelated text.
+      It fails silently rather than erroring. `Finding`, `Report`, `SpanIndex`
+      and `ValidateCtx` all assume a single source today and need provenance
+      before this ships.
+
+      Needs its own ADR. [ADR-006](adr/006-safe-settings-compatibility.md)
+      deferred `extends:` rather than forbidding it — *"may be revisited later
+      on its own merits, not as compatibility"* — so this narrows that scope
+      clause rather than reversing the record.
 
 ### Documentation
 
@@ -124,16 +172,17 @@ repository. Several are destructive.
 - [x] `plan`
 - [x] `sync`
 - [x] `export` → `plan` reports zero changes
-- [ ] Sync a **ruleset** with rules and `conditions.ref_name` — never run against
-      the real API
-- [ ] Update that ruleset (change a rule parameter) and re-sync — exercises
+- [x] Sync a **ruleset** with rules and `conditions.ref_name` — found a `422`;
+      GitHub requires *every* parameter of a `pull_request` rule, not a subset
+- [x] Update that ruleset (change a rule parameter) and re-sync — exercises
       `PUT /rulesets/{id}` and canonical rule ordering
 - [ ] A ruleset with `bypass_actors: [{ team: … }]` **on an organisation
       repository** — slug-to-id resolution; impossible to test on a personal repo
-- [ ] `repository.security.secret_scanning: true`
-- [ ] Change an autolink's `url_template` and re-sync — the recreate path
-- [ ] `sync --prune` after removing a label — the destructive path and its prompt
-- [ ] Run any `sync` **twice**; the second must report "up to date"
+- [x] `repository.security.secret_scanning: true`
+- [x] Change an autolink's `url_template` and re-sync — the recreate path
+- [x] `sync --prune` after removing a label — the destructive path and its prompt
+- [x] Run any `sync` **twice**; the second must report "up to date" — this is
+      what caught the ruleset permanent diff
 - [ ] `doctor` inside GitHub Actions with `secrets.GITHUB_TOKEN` — should report
       labels-only and say why
 - [ ] `gh extension install noirbizarre/gh-settings` on a clean machine

@@ -130,8 +130,10 @@ jobs:
         run: mise run docs:reference
 
       - name: Check the committed copies are up to date
+        # Only the generated paths. Diffing all of docs/ would also flag
+        # hand-written pages, which are not this job's business.
         run: |
-          if ! git diff --exit-code -- docs/ schema/; then
+          if ! git diff --exit-code -- docs/configuration.md docs/cli.md docs/authentication.md schema/; then
             echo "::error::Generated documentation is out of date. Run \`mise run docs:reference\` and commit the result."
             exit 1
           fi
