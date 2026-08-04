@@ -49,30 +49,40 @@ reason stops applying.
       `GH_SETTINGS_TEST_REPO=you/sandbox mise run test:live` — the sandbox must
       be **public**, since a private repository on the free plan answers
       `403 Upgrade to GitHub Pro` for rulesets.
-- [ ] **Ruleset apply-path tests through the stub.** Create, update, delete and
-      prune, asserting the request log. Manually verified against the real API
-      once; nothing yet stops a regression.
+- [x] **Ruleset apply-path tests through the stub.** Create, update, delete and
+      prune, asserting the request log — including that an update addresses the
+      server id rather than the name, which nothing else checked, and that
+      server-only fields never travel back.
 - [x] **Repository security PATCH test** — covered by the live suite.
 - [x] **Generic idempotency contract** — the live suite re-plans after every
       mutation and asserts the plan is empty, for every resource. Checked
       against reality rather than against our own fixtures, which is the only
       version of this assertion that would have caught the ruleset permanent
       diff.
-- [ ] **Snapshots for `plan`, `doctor` and `export`.** Only `validate` output is
-      snapshotted, so the other three can regress silently.
-- [ ] **`--continue-on-error` integration test.** Implemented and unit-tested,
-      never exercised through the binary.
+- [x] **Snapshots for `plan`, `doctor` and `export`.** Including `plan
+      --verbose`, which is the reason there is no separate `diff` command, and
+      `doctor`'s "unknown" verdict. The shared `assert_cli_snapshot!` applies the
+      stabilising filters, because forgetting them fails only on someone else's
+      machine.
+- [x] **`--continue-on-error` integration test.** Exercised through the binary:
+      every change attempted, partial success preserved, and every failure
+      reported in the JSON output rather than just the first.
 
 ### Behaviour
 
-- [ ] **`sync` pre-flight permission check.** Today a permission problem is
-      discovered only *after* a failed write. The `Requirement` data already
-      exists ([ADR-015](adr/015-token-requirements.md)); consulting it up front
-      lets `sync` fail fast and name the missing permission. Must stay
-      conservative — refuse only when certain, and let an unknown token proceed
-      so the real error can speak.
-- [ ] **Attach the requirement table to a `403`**, rather than the current
-      generic "run `doctor`" hint.
+`Requirement::verdict` in `src/resources/requirement.rs` is the single place a
+credential is judged. `doctor` renders it and `sync` refuses on it, so the two
+cannot disagree about what a token can do.
+
+- [x] **`sync` pre-flight permission check.** Refuses before the first request
+      when a change is certain to be rejected, naming the permission. Stays
+      conservative: only `Capability::Impossible` blocks, and an
+      unintrospectable token proceeds so the real error can speak. There is no
+      flag to overrule a refusal, which is why the bar for making one is proof.
+- [x] **Attach the requirement table to a `403`.** Per failing resource, so a
+      failed label write no longer points at `Administration: write`. The
+      GITHUB_TOKEN note appears only inside Actions, where it is the answer
+      rather than a false lead.
 - [ ] **Help with ruleset rule parameters.** GitHub requires *all* parameters of
       a rule, not the subset you want to change: a `pull_request` rule missing
       one field is rejected with `Invalid property /rules/1: data matches no
@@ -119,14 +129,7 @@ reason stops applying.
 
 ### Infrastructure
 
-- [ ] **Codecov token.** Uploads are currently tokenless; a rate-limited leg
-      leaves the coverage status *pending* rather than failed, which reads as
-      "still running" instead of "broken" — the worse failure mode.
-- [ ] **Pin `gh-ship`** in the release workflows. It is installed unpinned and
-      executed inside the privileged `release` environment, while every other
-      tool is pinned through `mise.lock`. The inconsistency, not the trust, is
-      the problem.
-- [ ] Harden `${{ inputs.tag }}` interpolation in `publish-release.yaml` by
+- [x] Harden `${{ inputs.tag }}` interpolation in `publish-release.yaml` by
       passing through `env:`. Only reachable by someone who already has write
       access, so defence in depth rather than a hole.
 

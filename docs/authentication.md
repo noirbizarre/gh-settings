@@ -157,6 +157,31 @@ actually enforces.
 
 ---
 
+## What `sync` checks before it writes
+
+`sync` consults the table above before making its first request, and refuses to
+start when a change is *certain* to be rejected — naming the permission rather
+than letting you discover it through a failed write.
+
+It only refuses when it can prove the problem:
+
+| Credential | Behaviour |
+|---|---|
+| Classic token missing `repo` | **Refused.** Scopes are advertised, so this is a fact. |
+| Actions `GITHUB_TOKEN` on an `Administration: write` resource | **Refused.** No `permissions:` block can grant it. |
+| Fine-grained or App token | **Allowed to proceed**, unless the repository read shows it has no admin rights. |
+| Credential that could not be introspected | **Allowed to proceed.** |
+
+That last row is deliberate. A token we cannot understand is not a token we know
+to be insufficient, and there is no flag to overrule a refusal — so when in
+doubt `sync` lets GitHub answer, and you get GitHub's error rather than our
+guess about it.
+
+When a write *is* refused, the failure names the permission that was missing,
+for that specific resource.
+
+---
+
 ## GitHub Enterprise Server
 
 Authentication, host selection and pagination are all inherited from the GitHub
@@ -169,9 +194,13 @@ CLI, so `gh auth login --hostname github.example.com` is all that is required.
 **`HTTP 403: Resource not accessible by integration`**
 You are almost certainly using `secrets.GITHUB_TOKEN`. See above.
 
+**`Refusing to start: this token cannot make some of these changes`**
+The pre-flight check proved the write would fail, so nothing was attempted. The
+message names the resource and the missing permission; grant it and re-run.
+
 **`HTTP 403` with a personal access token**
 Your token is missing `repo` (classic) or `Administration: write`
-(fine-grained). Run `gh settings doctor`.
+(fine-grained). The error names the permission for the resource that failed.
 
 **`HTTP 404` on a repository you can see in the browser**
 A fine-grained token only covers repositories it was explicitly granted. Check

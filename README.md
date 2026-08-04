@@ -271,6 +271,12 @@ Resources
 Full details, including the exact scopes each resource needs, are in
 [docs/authentication.md](docs/authentication.md).
 
+`sync` checks this before its first request and refuses to start when a change
+is *certain* to be rejected, naming the permission instead of letting you find
+out through a failed write. It refuses only when it can prove the problem — a
+credential it cannot introspect is allowed through, so you get GitHub's error
+rather than a guess.
+
 ---
 
 ## 🧩 Supported settings
