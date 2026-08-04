@@ -81,10 +81,16 @@ jobs:
 
       - name: Stage the asset
         shell: bash
+        # `inputs.tag` reaches the shell through `env:` rather than being
+        # interpolated into the script, so its contents can never be parsed as
+        # shell. Only someone with write access can dispatch this workflow, so
+        # this is defence in depth rather than a hole.
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/gh-settings${{ matrix.ext }}" \
-             "dist/gh-settings_${{ inputs.tag }}_${{ matrix.asset }}${{ matrix.ext }}"
+             "dist/gh-settings_${TAG}_${{ matrix.asset }}${{ matrix.ext }}"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -135,4 +141,6 @@ jobs:
       # dispatching this workflow, and will undraft it once we succeed.
       # That ordering is what lets assets land before anyone is notified.
       - name: Upload assets to the draft release
-        run: gh release upload "${{ inputs.tag }}" dist/* --clobber
+        env:
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" dist/* --clobber
