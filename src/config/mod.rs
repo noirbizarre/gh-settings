@@ -7,6 +7,7 @@
 
 pub mod diagnostics;
 pub mod discover;
+pub mod provenance;
 pub mod prunable;
 pub mod settings;
 pub mod source;
@@ -14,6 +15,7 @@ pub mod spans;
 
 pub use diagnostics::{Finding, Report, Severity, suggest};
 pub use discover::{ConfigSource, discover};
+pub use provenance::Provenance;
 pub use prunable::Prunable;
 pub use settings::Settings;
 pub use source::{FileSpan, SourceFile, SourceId, Sources};
@@ -34,6 +36,8 @@ pub struct Config {
     pub sources: Sources,
     /// Span index per document, in the same order as [`Config::sources`].
     pub spans: Vec<SpanIndex>,
+    /// Where each logical configuration path physically lives.
+    pub provenance: Provenance,
     /// The typed settings.
     pub settings: Settings,
 }
@@ -151,10 +155,13 @@ pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError
         }
     };
 
+    let provenance = Provenance::for_document(root, &spans, &settings);
+
     Ok(Config {
         path: path.to_path_buf(),
         sources,
         spans: vec![spans],
+        provenance,
         settings,
     })
 }

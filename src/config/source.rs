@@ -36,8 +36,9 @@ impl SourceId {
     /// choose a primary document without searching.
     pub const ROOT: SourceId = SourceId(0);
 
-    /// Position in the owning [`Sources`].
-    fn index(self) -> usize {
+    /// Position in the owning [`Sources`], and in any collection kept parallel
+    /// to it — such as `Config::spans`.
+    pub fn index(self) -> usize {
         self.0 as usize
     }
 }

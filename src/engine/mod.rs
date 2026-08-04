@@ -51,7 +51,7 @@ impl Engine {
     /// Collects *every* finding rather than stopping at the first, because
     /// fixing configuration one error per run is a miserable experience.
     pub fn validate(&self, config: &Config, only: &[ResourceId]) -> Vec<Finding> {
-        let ctx = ValidateCtx::layered(&config.spans);
+        let ctx = ValidateCtx::resolved(&config.spans, &config.provenance);
         let mut findings = config.settings.validate(&ctx);
 
         for resource in self.registry.selected(only) {
