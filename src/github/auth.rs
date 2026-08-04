@@ -315,6 +315,29 @@ pub async fn gh_auth_token(program: &std::ffi::OsStr) -> Option<String> {
     (!token.is_empty()).then_some(token)
 }
 
+/// Read the installed `gh` version, or `None` when `gh` cannot be run.
+///
+/// Takes the program the same way its neighbours do. It lived in `cli::doctor`
+/// with `"gh"` hard-coded, which both broke the rule that this module is the
+/// only place that spawns `gh` and meant a relocated `gh` was found by the two
+/// calls beside it and not by this one.
+pub async fn gh_version(program: &std::ffi::OsStr) -> Option<String> {
+    let output = tokio::process::Command::new(program)
+        .arg("--version")
+        .output()
+        .await
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

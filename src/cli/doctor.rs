@@ -24,7 +24,7 @@ pub struct Args {
 
 /// Run the command.
 pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
-    let gh_version = gh_version().await;
+    let gh_version = auth::gh_version(&gh_program()).await;
 
     let auth_status = if gh_version.is_some() {
         introspect(ctx).await
@@ -87,9 +87,14 @@ fn capabilities(ctx: &Context, auth: Option<&AuthStatus>) -> Vec<(ResourceId, Ca
         .collect()
 }
 
+/// The `gh` executable every probe here spawns.
+fn gh_program() -> std::ffi::OsString {
+    std::ffi::OsString::from("gh")
+}
+
 /// Introspect the current credential, degrading gracefully at every step.
 pub(crate) async fn introspect(ctx: &Context) -> Option<AuthStatus> {
-    let program = std::ffi::OsString::from("gh");
+    let program = gh_program();
     let gh_auth = auth::gh_auth_status(&program).await.ok()?;
     let token = auth::gh_auth_token(&program).await;
 
@@ -116,22 +121,4 @@ pub(crate) async fn introspect(ctx: &Context) -> Option<AuthStatus> {
     }
 
     Some(status)
-}
-
-/// Read the installed `gh` version.
-async fn gh_version() -> Option<String> {
-    let output = tokio::process::Command::new("gh")
-        .arg("--version")
-        .output()
-        .await
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .next()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(str::to_string)
 }

@@ -114,6 +114,7 @@ The App needs the repository permissions listed below.
 | **Metadata** | Read | Mandatory baseline for every fine-grained token |
 | **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets` |
 | **Issues** | Read & write | `labels` |
+| **Contents** | Read | Reading a base named in `extends:` — **on that repository**, not this one |
 | *Organization → Members* | Read | Resolving `bypass_actors: [{ team: … }]` (organisation repositories only) |
 
 Fine-grained tokens do not report their permissions through the API. `doctor`
@@ -150,8 +151,11 @@ actually enforces.
 | `labels` | Metadata: read, Issues: write | `repo` | ✔ |
 | `autolinks` | Metadata: read, Administration: write | `repo` | ✘ |
 | `rulesets` | Metadata: read, Administration: write | `repo` | ✘ |
+| `extends` | Contents: read | `repo` | ✘ |
 
 `repository`, `topics`, `autolinks` and `rulesets` require `Administration: write`, which **cannot be granted** to the Actions `GITHUB_TOKEN` — the workflow `permissions:` block has no `administration` key. Use a personal access token or a GitHub App token.
+
+`extends` is not a resource — it is read while loading the configuration — and it requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have.
 
 <!-- /generated -->
 

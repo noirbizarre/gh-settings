@@ -71,7 +71,7 @@ Check that the environment can actually manage these settings
 
 | Option | Description |
 |---|---|
-| `--strict` | Exit non-zero when any resource is unmanageable. |
+| `--strict` | Also fail when a capability cannot be determined, not just when it is certainly impossible. |
 
 ### `gh settings schema`
 

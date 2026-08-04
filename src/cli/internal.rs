@@ -23,6 +23,7 @@ use miette::Result;
 
 use crate::cli::exit;
 use crate::engine::Registry;
+use crate::resources::Requirement;
 use crate::resources::requirement::Confidence;
 
 /// Arguments for `internal`.
@@ -58,13 +59,22 @@ pub const BEGIN: &str = "<!-- generated: do not edit below -->";
 /// Closing marker for a generated region.
 pub const END: &str = "<!-- /generated -->";
 
-/// Render the per-resource permission table.
+/// Render the permission table.
 ///
 /// Walks the real registry, so a resource that is added without declaring a
-/// requirement cannot be omitted from the published table.
+/// requirement cannot be omitted from the published table. `extends` is appended
+/// by hand because it belongs to no resource — it is needed while *loading* the
+/// configuration — and being outside the registry is exactly how it came to be
+/// documented in prose that nothing checks.
 pub fn requirements() -> String {
     let registry = Registry::default();
     let mut out = String::new();
+
+    let rows: Vec<(String, &'static Requirement)> = registry
+        .all()
+        .map(|resource| (format!("`{}`", resource.id()), resource.requirement()))
+        .chain([("`extends`".to_string(), &Requirement::CONTENTS)])
+        .collect();
 
     let _ = writeln!(out, "{BEGIN}");
     let _ = writeln!(out);
@@ -76,9 +86,7 @@ pub fn requirements() -> String {
 
     let mut any_unverified = false;
 
-    for resource in registry.all() {
-        let requirement = resource.requirement();
-
+    for (label, requirement) in &rows {
         let fine_grained = requirement
             .fine_grained
             .iter()
@@ -113,8 +121,7 @@ pub fn requirements() -> String {
 
         let _ = writeln!(
             out,
-            "| `{}` | {fine_grained} | {classic} | {github_token} |",
-            resource.id()
+            "| {label} | {fine_grained} | {classic} | {github_token} |"
         );
     }
 
@@ -136,6 +143,8 @@ pub fn requirements() -> String {
         .map(|resource| format!("`{}`", resource.id()))
         .collect();
 
+    let inheritance_note = Requirement::CONTENTS.github_token_note;
+
     if !blocked.is_empty() {
         let _ = writeln!(out);
         let _ = writeln!(
@@ -144,6 +153,18 @@ pub fn requirements() -> String {
              Actions `GITHUB_TOKEN` — the workflow `permissions:` block has no \
              `administration` key. Use a personal access token or a GitHub App token.",
             join_with_and(&blocked)
+        );
+    }
+
+    // A different dead end from the one above, and reached by a different route:
+    // the permission exists, it is simply on a repository the workflow token was
+    // never scoped to.
+    if let Some(note) = inheritance_note {
+        let _ = writeln!(out);
+        let _ = writeln!(
+            out,
+            "`extends` is not a resource — it is read while loading the configuration — \
+             and it {note}."
         );
     }
 
@@ -412,6 +433,22 @@ mod tests {
         assert!(table.contains("| `labels` | Metadata: read, Issues: write | `repo` | ✔ |"));
         assert!(
             table.contains("| `repository` | Metadata: read, Administration: write | `repo` | ✘ |")
+        );
+    }
+
+    #[test]
+    fn the_table_covers_the_permission_that_belongs_to_no_resource() {
+        // `extends` is read while loading, so it is not in the registry. Being
+        // outside the registry is how it came to be documented only in prose
+        // that nothing checked, while the table above claimed to be exhaustive.
+        let table = requirements();
+        assert!(
+            table.contains("| `extends` | Contents: read | `repo` | ✘ |"),
+            "{table}"
+        );
+        assert!(
+            table.contains("Contents: read on the *other* repository"),
+            "{table}"
         );
     }
 
