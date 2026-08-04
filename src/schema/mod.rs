@@ -101,6 +101,7 @@ mod tests {
 
         for section in [
             "version",
+            "extends",
             "repository",
             "topics",
             "labels",

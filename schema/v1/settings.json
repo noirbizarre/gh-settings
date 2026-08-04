@@ -720,6 +720,13 @@
       ],
       "description": "Autolink references."
     },
+    "extends": {
+      "description": "Inherit this configuration from another repository.\n\nWritten as `owner/repo@ref`, optionally with a path:\n`acme/.github@v1` reads `.github/settings.yml` from the `acme/.github`\nrepository at the `v1` ref. The ref is required, so a shared base cannot\nmove underneath a plan that was reviewed against it.\n\nAnything the local file declares wins. Collections are merged by item\nidentity — a label of the same name replaces the inherited one outright —\nand `prune` is never inherited, so editing a shared file cannot start\ndeleting things in the repositories that extend it.\n\nA base configuration may not itself use `extends`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "labels": {
       "anyOf": [
         {

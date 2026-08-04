@@ -7,6 +7,7 @@
 
 pub mod diagnostics;
 pub mod discover;
+pub mod extends;
 pub mod merge;
 pub mod provenance;
 pub mod prunable;
@@ -16,6 +17,7 @@ pub mod spans;
 
 pub use diagnostics::{Finding, Report, Severity, suggest};
 pub use discover::{ConfigSource, discover};
+pub use extends::{BaseLoader, LoadedBase, Reference};
 pub use provenance::Provenance;
 pub use prunable::Prunable;
 pub use settings::Settings;

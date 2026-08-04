@@ -91,6 +91,10 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
 
     let settings = Settings {
         version,
+        // Consumed by the loader. Carrying it into the merged result would
+        // make an already-resolved configuration look like it still had work
+        // to do, and would be re-emitted by `export`.
+        extends: None,
         repository,
         topics,
         labels,

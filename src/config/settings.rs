@@ -35,6 +35,22 @@ pub struct Settings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<u32>,
 
+    /// Inherit this configuration from another repository.
+    ///
+    /// Written as `owner/repo@ref`, optionally with a path:
+    /// `acme/.github@v1` reads `.github/settings.yml` from the `acme/.github`
+    /// repository at the `v1` ref. The ref is required, so a shared base cannot
+    /// move underneath a plan that was reviewed against it.
+    ///
+    /// Anything the local file declares wins. Collections are merged by item
+    /// identity — a label of the same name replaces the inherited one outright —
+    /// and `prune` is never inherited, so editing a shared file cannot start
+    /// deleting things in the repositories that extend it.
+    ///
+    /// A base configuration may not itself use `extends`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends: Option<String>,
+
     /// Repository metadata: description, homepage, features, merge and security
     /// settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -85,7 +101,10 @@ impl Settings {
 
     /// Whether the file declares nothing at all.
     pub fn is_empty(&self) -> bool {
-        self.repository.is_none()
+        // `extends` counts: a file that inherits a whole configuration is not
+        // one that declares nothing.
+        self.extends.is_none()
+            && self.repository.is_none()
             && self.topics.is_none()
             && self.labels.is_none()
             && self.autolinks.is_none()

@@ -37,6 +37,25 @@ A single autolink reference.
 | `url_template` | string | yes | Target URL, containing the `<num>` placeholder. |
 
 
+## `extends`
+
+Inherit this configuration from another repository.
+
+Written as `owner/repo@ref`, optionally with a path:
+`acme/.github@v1` reads `.github/settings.yml` from the `acme/.github`
+repository at the `v1` ref. The ref is required, so a shared base cannot
+move underneath a plan that was reviewed against it.
+
+Anything the local file declares wins. Collections are merged by item
+identity — a label of the same name replaces the inherited one outright —
+and `prune` is never inherited, so editing a shared file cannot start
+deleting things in the repositories that extend it.
+
+A base configuration may not itself use `extends`.
+
+Type: string
+
+
 ## `labels`
 
 Issue and pull request labels.
