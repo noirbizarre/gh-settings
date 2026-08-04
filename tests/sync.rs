@@ -771,3 +771,112 @@ fn sync_renders_what_it_applied() {
     output.expect_status(0);
     assert_cli_snapshot!(output.stdout);
 }
+
+#[test]
+fn continue_on_error_attempts_every_change() {
+    // The mirror of `sync_stops_at_the_first_failure_by_default`. The flag has
+    // been implemented and unit-tested since it landed, but never exercised
+    // through the binary — so nothing proved the CLI actually threaded it into
+    // `ApplyOptions`, which is the only part a user can observe.
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nlabels:\n  - name: aaa\n    color: a2eeef\n  - name: zzz\n    color: a2eeef\n",
+        )
+        .get("repos/o/r/labels", "[]")
+        .respond(
+            "POST",
+            "repos/o/r/labels",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--continue-on-error"]);
+
+    // Still a failure: carrying on is not the same as succeeding.
+    output.expect_status(1);
+    assert_eq!(
+        output.writes().len(),
+        2,
+        "both changes should have been attempted: {:?}",
+        output.writes()
+    );
+    assert!(
+        output.stdout.contains("0 skipped"),
+        "carrying on means nothing is skipped: {}",
+        output.stdout
+    );
+}
+
+#[test]
+fn continue_on_error_applies_what_it_can() {
+    // The reason to want the flag: one broken change must not cost you the
+    // others. Deletions address a label by name, which is what makes a
+    // per-change failure expressible here — the two creations share an endpoint
+    // and so cannot be told apart by the stub.
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  prune: true\n  items:\n    - name: feature\n      color: a2eeef\n")
+        .get(
+            "repos/o/r/labels",
+            r#"[{"name": "aaa", "color": "cccccc"}, {"name": "zzz", "color": "cccccc"}]"#,
+        )
+        .respond("POST", "repos/o/r/labels", Fixture::created("{}"))
+        .respond(
+            "DELETE",
+            "repos/o/r/labels/aaa",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .respond("DELETE", "repos/o/r/labels/zzz", Fixture::no_content())
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--continue-on-error"]);
+
+    // One change failed, so the run failed — but the other two still happened.
+    output.expect_status(1);
+    assert_eq!(
+        output.writes().len(),
+        3,
+        "every change should have been attempted: {:?}",
+        output.writes()
+    );
+    assert!(
+        output.stdout.contains("2 applied"),
+        "the changes that could succeed should have: {}",
+        output.stdout
+    );
+}
+
+#[test]
+fn continue_on_error_reports_every_failure_in_json() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nlabels:\n  - name: aaa\n    color: a2eeef\n  - name: zzz\n    color: a2eeef\n",
+        )
+        .get("repos/o/r/labels", "[]")
+        .respond(
+            "POST",
+            "repos/o/r/labels",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .build();
+
+    let output = runner.run(&[
+        "sync",
+        "-R",
+        "o/r",
+        "--yes",
+        "--continue-on-error",
+        "--format",
+        "json",
+    ]);
+    output.expect_status(1);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["success"], false);
+    let failures = value["failures"].as_array().expect("failures");
+    assert_eq!(
+        failures.len(),
+        2,
+        "a machine consumer must see both failures, not just the first: {}",
+        output.stdout
+    );
+}
