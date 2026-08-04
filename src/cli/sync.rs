@@ -281,6 +281,18 @@ async fn load_saved_plan(
     // Recompute and compare: the repository may have changed since the plan was
     // reviewed, in which case applying it blind would be wrong.
     let fresh = compute_plan(args, ctx).await?;
+
+    // An inherited configuration that moved is reported as such. It is by far
+    // the likeliest cause once a base is shared, and it is not the repository
+    // that drifted — a plain drift error would send people to look at a
+    // repository that has not changed.
+    if let Some(moved) = fresh.bases.iter().find(|base| !saved.bases.contains(base)) {
+        return Err(ArtifactError::BaseMoved {
+            reference: moved.reference.clone(),
+        }
+        .into());
+    }
+
     if fresh.fingerprint() != saved.fingerprint() {
         return Err(ArtifactError::Drift.into());
     }

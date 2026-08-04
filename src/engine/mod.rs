@@ -83,6 +83,14 @@ impl Engine {
         only: &[ResourceId],
     ) -> GitHubResult<Plan> {
         let mut plan = Plan::new(target.clone());
+        plan.bases = config
+            .bases
+            .iter()
+            .map(|(reference, commit)| crate::engine::plan::BaseRecord {
+                reference: reference.to_string(),
+                commit: commit.clone(),
+            })
+            .collect();
 
         // Sequential rather than concurrent: `gh api` spawns a process per call,
         // and interleaving them makes failures much harder to attribute. The

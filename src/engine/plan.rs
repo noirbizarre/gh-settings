@@ -16,6 +16,12 @@ pub struct Plan {
     pub target: Target,
     /// Per-resource plans, in application order.
     pub resources: Vec<ResourcePlan>,
+    /// Configurations this plan inherited from, and the commits they were read
+    /// at.
+    ///
+    /// Recorded so that a base moving between planning and applying is reported
+    /// as the base moving, rather than as the repository having drifted.
+    pub bases: Vec<BaseRecord>,
 }
 
 impl Plan {
@@ -24,6 +30,7 @@ impl Plan {
         Self {
             target,
             resources: Vec::new(),
+            bases: Vec::new(),
         }
     }
 
@@ -68,6 +75,7 @@ impl Plan {
             repository: self.target.slug(),
             counts: self.counts(),
             changes: self.changes().cloned().collect(),
+            bases: self.bases.clone(),
         }
     }
 
@@ -81,6 +89,12 @@ impl Plan {
 
         let mut hasher = DefaultHasher::new();
         self.target.slug().hash(&mut hasher);
+        // Inherited documents are part of the input, so a base that moved makes
+        // this a different plan even when the resulting changes coincide.
+        for base in &self.bases {
+            base.reference.hash(&mut hasher);
+            base.commit.hash(&mut hasher);
+        }
         for change in self.changes() {
             change.resource.as_str().hash(&mut hasher);
             change.op.verb().hash(&mut hasher);
@@ -107,6 +121,22 @@ pub struct PlanArtifact {
     pub counts: Counts,
     /// Every change, in application order.
     pub changes: Vec<Change>,
+    /// Configurations this plan inherited from.
+    ///
+    /// Defaulted, so a plan written before inheritance existed still loads and
+    /// the format stays at version 1.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bases: Vec<BaseRecord>,
+}
+
+/// An inherited configuration, as recorded in a saved plan.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct BaseRecord {
+    /// The reference as written, e.g. `acme/.github@v1`.
+    pub reference: String,
+    /// The commit the document was read at, when it could be determined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit: Option<String>,
 }
 
 impl PlanArtifact {
@@ -187,6 +217,21 @@ pub enum ArtifactError {
         help("re-run `gh settings plan` and review the new plan before applying")
     )]
     Drift,
+
+    /// An inherited configuration changed since the plan was written.
+    ///
+    /// Distinguished from `Drift` because the repository being configured has
+    /// not changed at all, and saying it had would send people to look in the
+    /// wrong place — a shared base file is usually owned by someone else.
+    #[error("the inherited configuration `{reference}` changed since this plan was written")]
+    #[diagnostic(
+        code(gh_settings::plan::base_moved),
+        help("re-run `gh settings plan` to pick up the new base, or pin `extends` to a commit")
+    )]
+    BaseMoved {
+        /// The reference as written.
+        reference: String,
+    },
 }
 
 #[cfg(test)]
@@ -279,12 +324,46 @@ mod tests {
     }
 
     #[test]
+    fn a_plan_written_before_inheritance_existed_still_loads() {
+        // `bases` is defaulted, which is what keeps the format at version 1.
+        // Built by serialising a current plan, so the rest of the shape cannot
+        // drift out from under the assertion.
+        let json = serde_json::to_string(&Plan::new(Target::new("o", "r")).to_artifact())
+            .expect("serialises");
+        assert!(!json.contains("bases"), "{json}");
+
+        let artifact: PlanArtifact = serde_json::from_str(&json).expect("loads");
+        assert!(artifact.bases.is_empty());
+        assert_eq!(artifact.version, ARTIFACT_VERSION);
+    }
+
+    #[test]
+    fn a_base_at_a_different_commit_makes_a_different_plan() {
+        // The inherited document is part of the input, so the fingerprint has
+        // to move with it even when the resulting changes happen to coincide.
+        let mut first = Plan::new(Target::new("o", "r"));
+        first.bases.push(BaseRecord {
+            reference: "acme/.github@v1".into(),
+            commit: Some("aaaa".into()),
+        });
+
+        let mut second = Plan::new(Target::new("o", "r"));
+        second.bases.push(BaseRecord {
+            reference: "acme/.github@v1".into(),
+            commit: Some("bbbb".into()),
+        });
+
+        assert_ne!(first.fingerprint(), second.fingerprint());
+    }
+
+    #[test]
     fn rejects_an_unknown_artifact_version() {
         let artifact = PlanArtifact {
             version: 99,
             repository: "o/r".into(),
             counts: Counts::default(),
             changes: Vec::new(),
+            bases: Vec::new(),
         };
         assert!(matches!(
             artifact.to_plan(),
@@ -299,6 +378,7 @@ mod tests {
             repository: "not-a-repo".into(),
             counts: Counts::default(),
             changes: Vec::new(),
+            bases: Vec::new(),
         };
         assert!(matches!(
             artifact.to_plan(),

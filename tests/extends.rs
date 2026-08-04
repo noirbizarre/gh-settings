@@ -220,3 +220,57 @@ fn inherited_repository_settings_merge_field_by_field() {
         "a field the local file never mentioned stays inherited: {writes:?}"
     );
 }
+
+#[test]
+fn a_saved_plan_reports_a_moved_base_as_a_moved_base() {
+    // Not as drift. The repository being configured has not changed at all, and
+    // a shared base is usually owned by someone else — sending people to look at
+    // their own repository would waste the one thing the message is for.
+    let runner = with_base(
+        Sandbox::new().config("version: 1\nextends: acme/.github@v1\n"),
+        "labels:\n  - name: bug\n    color: d73a4a\n",
+    )
+    .get("repos/o/r/labels", "[]")
+    .build();
+
+    let plan_path = runner.path().join("plan.json");
+    let plan_arg = plan_path.display().to_string();
+
+    runner
+        .run(&["plan", "-R", "o/r", "--out", &plan_arg])
+        .expect_status(2);
+
+    // The base is served again with different content, as a moving ref would.
+    let moved = Sandbox::new()
+        .config("version: 1\nextends: acme/.github@v1\n")
+        .respond(
+            "GET",
+            BASE_ENDPOINT,
+            Fixture::ok("labels:\n  - name: chore\n    color: cccccc\n")
+                .header("etag", "\"moved\""),
+        )
+        .get("repos/o/r/labels", "[]")
+        .build();
+
+    std::fs::copy(&plan_path, moved.path().join("plan.json")).expect("copy the saved plan");
+    let output = moved.run(&[
+        "sync",
+        "-R",
+        "o/r",
+        "--yes",
+        "--plan",
+        &moved.path().join("plan.json").display().to_string(),
+    ]);
+
+    output.expect_status(1);
+    assert!(
+        output.stderr.contains("acme/.github@v1"),
+        "the message must name the base that moved: {}",
+        output.stderr
+    );
+    assert!(
+        output.writes().is_empty(),
+        "nothing should have been applied: {:?}",
+        output.writes()
+    );
+}
