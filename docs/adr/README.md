@@ -22,3 +22,4 @@ supersedes it, rather than a rewrite of history.
 | [014](014-releases.md) | Releases are orchestrated by gh-ship | Accepted |
 | [015](015-token-requirements.md) | Token requirements are declared per resource | Accepted |
 | [016](016-diagnostic-provenance.md) | Diagnostics carry the identity of the document they came from | Accepted |
+| [017](017-inheritance.md) | Inheritance replaces whole items, and provenance follows the merge | Accepted |

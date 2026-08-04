@@ -15,5 +15,7 @@ Resources
   ✘ autolinks   requires Administration: write, which cannot be granted to GITHUB_TOKEN
   ✘ rulesets    requires Administration: write, which cannot be granted to GITHUB_TOKEN
 
+  ✘ extends     requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have
+
 → Use a personal access token or a GitHub App installation token.
   See https://noirbizarre.github.io/gh-settings/authentication/

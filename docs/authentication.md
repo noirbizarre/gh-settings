@@ -157,6 +157,30 @@ actually enforces.
 
 ---
 
+## Inheriting from another repository
+
+`extends: acme/.github@v1` reads a configuration from a different repository,
+which needs **`Contents: read` on that repository** — not on the one being
+configured.
+
+The Actions `GITHUB_TOKEN` cannot do this. It is scoped to the repository
+running the workflow, so it cannot read a base held anywhere else, and no
+`permissions:` block changes that. This is the same dead end as
+`Administration: write`, and `gh settings doctor` reports it.
+
+| Credential | Can inherit? |
+|---|---|
+| `gh auth login` on your machine | ✅ |
+| Classic token with `repo` | ✅ |
+| Fine-grained token | ✅ if the base repository is in its access list |
+| GitHub App installation token | ✅ if the app is installed on the base repository |
+| Actions `secrets.GITHUB_TOKEN` | ✖ never |
+
+A configuration that does not use `extends:` still needs no credentials at all
+to `validate`.
+
+---
+
 ## What `sync` checks before it writes
 
 `sync` consults the table above before making its first request, and refuses to
@@ -205,6 +229,12 @@ Your token is missing `repo` (classic) or `Administration: write`
 **`HTTP 404` on a repository you can see in the browser**
 A fine-grained token only covers repositories it was explicitly granted. Check
 the token's repository access list.
+
+**`could not read the base configuration`**
+The repository being configured is fine — the one that cannot be read is the
+one named in `extends:`. Check the reference, the ref, and that your token can
+read that repository. Inside Actions, `secrets.GITHUB_TOKEN` cannot read
+another repository at all.
 
 **`no team named X could be found`**
 Ruleset bypass actors need `read:org` (classic) or organisation `Members: read`

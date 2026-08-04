@@ -330,3 +330,29 @@ fn doctor_renders_the_actions_token() {
     let output = runner.run_with_env(&["doctor", "-R", "o/r"], &[("GITHUB_ACTIONS", "true")]);
     assert_cli_snapshot!(output.stdout);
 }
+
+#[test]
+fn inheritance_is_only_mentioned_when_it_cannot_work() {
+    // Most configurations do not inherit from anywhere. A line announcing that
+    // an unused feature is available would be noise in the common case.
+    let runner = sandbox("ghp_x", Some("repo, read:org")).build();
+    let output = runner.run(&["doctor", "-R", "o/r"]);
+    output.expect_status(0);
+    assert!(!output.stdout.contains("extends"), "{}", output.stdout);
+}
+
+#[test]
+fn the_actions_token_is_told_it_cannot_inherit() {
+    // Reading a base means reading *another* repository, which the workflow
+    // token cannot do — the same shape of dead end as `Administration: write`,
+    // and much better said here than discovered through a 404.
+    let runner = sandbox("ghs_actionstoken", Some("issues")).build();
+    let output = runner.run_with_env(&["doctor", "-R", "o/r"], &[("GITHUB_ACTIONS", "true")]);
+
+    assert!(output.stdout.contains("extends"), "{}", output.stdout);
+    assert!(
+        output.stdout.contains("Contents: read"),
+        "{}",
+        output.stdout
+    );
+}

@@ -15,5 +15,7 @@ Resources
   ✘ autolinks   missing the `repo` scope
   ✘ rulesets    missing the `repo` scope
 
+  ✘ extends     missing the `repo` scope
+
 → Use a personal access token or a GitHub App installation token.
   See https://noirbizarre.github.io/gh-settings/authentication/

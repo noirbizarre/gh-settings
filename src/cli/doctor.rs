@@ -32,6 +32,7 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     };
 
     let capabilities = capabilities(ctx, auth_status.as_ref());
+    let inheritance = crate::resources::Requirement::CONTENTS.verdict(auth_status.as_ref());
 
     if ctx.args.is_json() {
         println!(
@@ -42,8 +43,12 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     } else {
         println!(
             "{}",
-            ctx.human
-                .doctor(gh_version.as_deref(), auth_status.as_ref(), &capabilities)
+            ctx.human.doctor(
+                gh_version.as_deref(),
+                auth_status.as_ref(),
+                &capabilities,
+                &inheritance,
+            )
         );
     }
 

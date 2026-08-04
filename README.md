@@ -216,6 +216,33 @@ documentation:
 
 `gh settings export` writes it for you.
 
+### Sharing configuration across repositories
+
+```yaml
+version: 1
+extends: acme/.github@v1     # reads .github/settings.yml from acme/.github at v1
+
+labels:
+  - name: bug
+    color: ff0000           # replaces the inherited `bug` outright
+```
+
+Anything the local file declares wins. Collections merge by item identity — a
+label of the same name replaces the inherited one **as a whole**, so change one
+field and you restate the item.
+
+The ref is required, so a shared file cannot move underneath a plan you already
+reviewed. A base may not itself use `extends:`.
+
+**`prune` is never inherited.** Editing a shared file cannot start deleting
+things in the repositories that extend it. Note that `sync --prune` on the
+command line *does* apply to inherited items — that is a local, explicit
+instruction.
+
+Reading a base needs `Contents: read` on **that** repository, which the Actions
+`GITHUB_TOKEN` does not have. See
+[authentication](docs/authentication.md#inheriting-from-another-repository).
+
 ---
 
 ## 🔑 Authentication
@@ -288,6 +315,7 @@ rather than a guess.
 | Labels (including renames) | ✅ |
 | Autolinks | ✅ |
 | Rulesets | ✅ |
+| Inheritance from a shared repository (`extends:`) | ✅ |
 
 Custom properties, environments, variables, webhooks, Pages and collaborators
 are planned; secrets are [deliberately out of

@@ -5,6 +5,11 @@
 Accepted. Extends [ADR-008](008-yaml-spans.md), which established the span index
 but assumed a single source document.
 
+The resolution rule below — by path against the layer stack, last writer first —
+is superseded by [ADR-017](017-inheritance.md). It cannot work for collections,
+whose positions differ between documents; provenance is recorded by the merge
+instead, with no fallback.
+
 ## Context
 
 A `miette::SourceSpan` is a byte offset and a length. Nothing more. That is

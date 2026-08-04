@@ -70,6 +70,10 @@ reason stops applying.
 
 ### Behaviour
 
+Two span bugs were found while preparing this and fixed first: ruleset findings
+underlined whichever rule sorted into the position rather than the one the user
+wrote, and a configuration using only `repository.topics` panicked a debug build.
+
 `Requirement::verdict` in `src/resources/requirement.rs` is the single place a
 credential is judged. `doctor` renders it and `sync` refuses on it, so the two
 cannot disagree about what a token can do.
@@ -97,32 +101,21 @@ cannot disagree about what a token can do.
       the job summary, and annotates a 403 with the token explanation. See
       [GitHub Actions](actions.md).
 
-- [ ] **Inheritance (`extends:`)** — share labels, autolinks and rulesets across
-      repositories.
+- [x] **Inheritance (`extends:`)** — share labels, autolinks and rulesets across
+      repositories. See [ADR-017](adr/017-inheritance.md).
 
-      **Unblocked.** The diagnostics were the load-bearing risk, not the merge:
-      a `SourceSpan` is a byte offset with no file identity, so an offset from
-      the base file is still a *valid* index into the local one, and a finding
-      about the shared file would have rendered a confident underline over
-      unrelated text. [ADR-016](adr/016-diagnostic-provenance.md) settles that.
-      `Finding`, `Report`, `SpanIndex`, `ValidateCtx` and `Config` now carry
-      document identity, and the two-document rendering path is tested.
+      Collections replace the whole item by identity rather than merging field
+      by field: `Label::color` and `Ruleset::target`/`enforcement` are not
+      `Option`, so a parsed document cannot distinguish an omitted field from
+      one written to its default, and a field-wise merge would repaint an
+      inherited label grey the moment a child named it.
 
-      Settled in ADR-016: inherit from another repository, ref-pinnable
-      (`acme/.github@v1`), no local-path form; **single level**, so a base file
-      may not itself extend another; **`prune` never inherits**, because
-      otherwise editing one shared file would start deleting across every
-      repository that extends it, decided by someone who does not own them.
+      `prune` never inherits. The ref is required. A base may not itself
+      extend. Reading a base needs `Contents: read` on the other repository,
+      which the Actions `GITHUB_TOKEN` does not have — `doctor` says so.
 
-      Still open, and the first thing the `extends:` record must settle: how
-      collections merge — replace, concatenate, or by item identity with the
-      child overriding field by field. Provenance for an individual merged item
-      depends on that answer.
-
-      What remains to build: the `extends` key on `Settings` (a schema change,
-      additive per [ADR-007](adr/007-schema-is-the-contract.md)), fetching a
-      document from another repository through the contents API, and the merge
-      itself.
+      Still open: making those three fields `Option` would allow field-wise
+      merging, and is the way to revisit the trade-off above.
 
 ### Documentation
 

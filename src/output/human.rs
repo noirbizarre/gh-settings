@@ -190,6 +190,7 @@ impl HumanRenderer {
         gh_version: Option<&str>,
         auth: Option<&AuthStatus>,
         capabilities: &[(crate::resources::ResourceId, Capability)],
+        inheritance: &Capability,
     ) -> String {
         let mut out = String::new();
 
@@ -276,9 +277,23 @@ impl HumanRenderer {
             let _ = writeln!(out, "{}", line.trim_end());
         }
 
-        if capabilities
-            .iter()
-            .any(|(_, capability)| matches!(capability, Capability::Impossible(_)))
+        // Only when it cannot work. Most configurations do not inherit, and a
+        // line saying an unused feature is available is noise.
+        if let Capability::Impossible(reason) = inheritance {
+            let _ = writeln!(out);
+            let _ = writeln!(
+                out,
+                "  {} {:<width$}  {reason}",
+                self.theme.error("✘"),
+                "extends",
+                width = width
+            );
+        }
+
+        if matches!(inheritance, Capability::Impossible(_))
+            || capabilities
+                .iter()
+                .any(|(_, capability)| matches!(capability, Capability::Impossible(_)))
         {
             let _ = writeln!(out);
             let _ = writeln!(
@@ -427,7 +442,12 @@ mod tests {
             ),
             (ResourceId::Labels, Capability::Manageable),
         ];
-        let rendered = renderer().doctor(Some("gh 2.62.0"), Some(&auth), &capabilities);
+        let rendered = renderer().doctor(
+            Some("gh 2.62.0"),
+            Some(&auth),
+            &capabilities,
+            &Capability::Manageable,
+        );
 
         assert!(rendered.contains("Actions GITHUB_TOKEN"));
         assert!(rendered.contains("requires Administration: write"));
@@ -445,7 +465,8 @@ mod tests {
             scopes: crate::github::auth::Scopes::Unknown,
             admin_on_target: None,
         };
-        let rendered = renderer().doctor(Some("gh 2.62.0"), Some(&auth), &[]);
+        let rendered =
+            renderer().doctor(Some("gh 2.62.0"), Some(&auth), &[], &Capability::Manageable);
         assert!(
             rendered.contains("not reported by this token type"),
             "{rendered}"
@@ -454,7 +475,7 @@ mod tests {
 
     #[test]
     fn doctor_reports_a_missing_gh() {
-        let rendered = renderer().doctor(None, None, &[]);
+        let rendered = renderer().doctor(None, None, &[], &Capability::Unknown);
         assert!(rendered.contains("not found on PATH"));
         assert!(rendered.contains("gh auth login"));
     }

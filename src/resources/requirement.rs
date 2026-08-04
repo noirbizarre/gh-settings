@@ -123,6 +123,25 @@ impl Requirement {
         github_token_note: None,
     };
 
+    /// What it takes to read a configuration inherited from another repository.
+    ///
+    /// Not a resource requirement: it is needed while *loading* the
+    /// configuration, before any resource is consulted. Listed here because it
+    /// is a permission, and this is where permissions are declared.
+    ///
+    /// The Actions `GITHUB_TOKEN` is scoped to the repository running the
+    /// workflow, so it cannot read a base held anywhere else — the same shape of
+    /// problem as `Administration: write`, and worth saying before someone
+    /// spends an afternoon on a `404`.
+    pub const CONTENTS: Requirement = Requirement {
+        fine_grained: &[FineGrained::documented("Contents", Access::Read)],
+        classic: &["repo"],
+        github_token_capable: false,
+        github_token_note: Some(
+            "requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have",
+        ),
+    };
+
     /// Whether any mapping still needs empirical confirmation.
     pub fn has_unverified(&self) -> bool {
         self.fine_grained
