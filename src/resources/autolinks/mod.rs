@@ -339,9 +339,10 @@ impl Resource for Autolinks {
 pub fn validate(autolinks: &[Autolink], ctx: &ValidateCtx<'_>) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut seen: HashMap<&str, usize> = HashMap::new();
+    let base = ctx.items_path("autolinks");
 
     for (position, autolink) in autolinks.iter().enumerate() {
-        let path = format!("autolinks.{position}");
+        let path = format!("{base}.{position}");
 
         if autolink.key_prefix.is_empty() {
             findings.push(

@@ -156,6 +156,32 @@ impl<'a> ValidateCtx<'a> {
     pub fn key_span(&self, path: &str) -> Option<miette::SourceSpan> {
         self.spans.resolve_key(path)
     }
+
+    /// Whether the document declares this path.
+    pub fn contains(&self, path: &str) -> bool {
+        self.spans.contains(path)
+    }
+
+    /// Base path of a collection section's items.
+    ///
+    /// [`Prunable`](crate::config::Prunable) accepts both `labels: [...]` and
+    /// `labels: { prune: true, items: [...] }`. The object form nests the items
+    /// one level deeper, so a hardcoded `labels.0.name` matches nothing — and
+    /// because span lookup falls back to the nearest ancestor, the underline
+    /// silently covered the whole section instead of the offending field.
+    ///
+    /// Probes the document rather than the type: the parsed `Vec<T>` no longer
+    /// remembers which form it was written in. A `labels.items` node can only
+    /// come from the object form, since sequence children are keyed by numeric
+    /// index.
+    pub fn items_path(&self, section: &str) -> String {
+        let nested = format!("{section}.items");
+        if self.contains(&nested) {
+            nested
+        } else {
+            section.to_string()
+        }
+    }
 }
 
 /// One GitHub feature, managed declaratively.

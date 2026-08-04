@@ -710,9 +710,10 @@ fn render_parameters(parameters: Option<&Value>) -> String {
 pub fn validate(rulesets: &[Ruleset], ctx: &ValidateCtx<'_>) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut seen: HashMap<&str, usize> = HashMap::new();
+    let base = ctx.items_path("rulesets");
 
     for (position, ruleset) in rulesets.iter().enumerate() {
-        let path = format!("rulesets.{position}");
+        let path = format!("{base}.{position}");
 
         if ruleset.name.trim().is_empty() {
             findings.push(

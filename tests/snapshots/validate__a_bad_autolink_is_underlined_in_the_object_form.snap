@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:19]
+ 3 |   prune: true
+ 4 |   items:
+ 5 |     - key_prefix: ""
+   :                   ^|
+   :                    `-- `key_prefix` cannot be empty
+ 6 |       url_template: https://example.com/<num>
+   `----

@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:6:14]
+ 4 |   items:
+ 5 |     - name: bug
+ 6 |       color: NOTHEX
+   :              ^^^|^^
+   :                 `-- expected six hexadecimal digits
+   `----
+  help: colours look like `d73a4a`, optionally prefixed with `#`

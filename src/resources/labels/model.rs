@@ -235,9 +235,10 @@ const MAX_DESCRIPTION: usize = 100;
 pub fn validate(labels: &[Label], ctx: &ValidateCtx<'_>) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let base = ctx.items_path("labels");
 
     for (position, label) in labels.iter().enumerate() {
-        let path = format!("labels.{position}");
+        let path = format!("{base}.{position}");
 
         if label.name.trim().is_empty() {
             findings.push(
@@ -330,7 +331,7 @@ pub fn validate(labels: &[Label], ctx: &ValidateCtx<'_>) -> Vec<Finding> {
                         label.name
                     ),
                 )
-                .at(ctx.span(&format!("labels.{position}.new_name")))
+                .at(ctx.span(&format!("{base}.{position}.new_name")))
                 .labelled("collides with another entry")
                 .help("keep either the rename or the standalone declaration, not both"),
             );

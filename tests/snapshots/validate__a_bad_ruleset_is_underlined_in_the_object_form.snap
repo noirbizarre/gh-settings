@@ -1,0 +1,16 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:13]
+ 3 |   prune: true
+ 4 |   items:
+ 5 |     - name: ""
+   :             ^|
+   :              `-- ruleset name cannot be empty
+ 6 |       rules:
+ 7 |         - type: non_fast_forward
+   `----

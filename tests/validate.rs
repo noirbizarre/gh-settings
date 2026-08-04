@@ -212,3 +212,68 @@ fn a_branch_only_rule_on_a_tag_ruleset_is_rejected() {
     output.expect_status(1);
     assert_snapshot!(output.stderr);
 }
+
+// --- the two `Prunable` forms -----------------------------------------------
+//
+// Every collection section accepts both `labels: [...]` and
+// `labels: { prune: true, items: [...] }`. The object form nests items one level
+// deeper, and validation used to look under the bare section either way. The
+// lookup falls back to the nearest ancestor rather than failing, so the miss
+// turned into an underline covering the whole section — confidently wrong, which
+// is worse than no underline at all.
+
+#[test]
+fn a_bad_label_is_underlined_in_the_object_form() {
+    let output = validate(
+        "version: 1\nlabels:\n  prune: true\n  items:\n    - name: bug\n      color: NOTHEX\n",
+    );
+    output.expect_status(1);
+    assert!(
+        output.stderr.contains("NOTHEX"),
+        "the underline should reach the colour: {}",
+        output.stderr
+    );
+    assert!(
+        !output.stderr.contains(",->"),
+        "a span covering several lines means it swallowed the section: {}",
+        output.stderr
+    );
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn a_bad_label_is_underlined_in_the_list_form() {
+    // The form that always worked, kept beside its counterpart so a regression
+    // in either is visible next to the other.
+    let output = validate("version: 1\nlabels:\n  - name: bug\n    color: NOTHEX\n");
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn a_bad_autolink_is_underlined_in_the_object_form() {
+    let output = validate(
+        "version: 1\nautolinks:\n  prune: true\n  items:\n    - key_prefix: \"\"\n      url_template: https://example.com/<num>\n",
+    );
+    output.expect_status(1);
+    assert!(
+        !output.stderr.contains(",->"),
+        "a span covering several lines means it swallowed the section: {}",
+        output.stderr
+    );
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn a_bad_ruleset_is_underlined_in_the_object_form() {
+    let output = validate(
+        "version: 1\nrulesets:\n  prune: true\n  items:\n    - name: \"\"\n      rules:\n        - type: non_fast_forward\n",
+    );
+    output.expect_status(1);
+    assert!(
+        !output.stderr.contains(",->"),
+        "a span covering several lines means it swallowed the section: {}",
+        output.stderr
+    );
+    assert_snapshot!(output.stderr);
+}
