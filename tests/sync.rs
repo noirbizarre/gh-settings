@@ -880,3 +880,89 @@ fn continue_on_error_reports_every_failure_in_json() {
         output.stdout
     );
 }
+
+#[test]
+fn a_permission_failure_names_the_permission_that_was_missing() {
+    // The point of ADR-015's single declaration: the requirement is already in
+    // memory when the 403 arrives, so telling the user to go and look it up
+    // was withholding something we were holding.
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&default_repository())
+        .respond(
+            "PATCH",
+            "repos/o/r",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(1);
+
+    assert!(
+        output.stderr.contains("Administration: write"),
+        "the explanation must name the permission: {}",
+        output.stderr
+    );
+    assert!(
+        output.stderr.contains("repo"),
+        "and the classic scope: {}",
+        output.stderr
+    );
+
+    assert_cli_snapshot!(output.stderr);
+}
+
+#[test]
+fn a_permission_failure_on_labels_does_not_mention_administration() {
+    // The explanation is per-resource. Labels need `Issues: write`, and telling
+    // someone to grant `Administration: write` for a failed label write would
+    // send them to change a setting that has nothing to do with it.
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: feature\n    color: a2eeef\n")
+        .get("repos/o/r/labels", "[]")
+        .respond(
+            "POST",
+            "repos/o/r/labels",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(1);
+
+    assert!(output.stderr.contains("Issues: write"), "{}", output.stderr);
+    assert!(
+        !output.stderr.contains("Administration"),
+        "labels do not need Administration: {}",
+        output.stderr
+    );
+}
+
+#[test]
+fn a_permission_failure_inside_actions_says_the_token_cannot_be_granted_it() {
+    // Inside Actions the note is the answer rather than a distraction: no
+    // `permissions:` block can grant `Administration: write`, so a user who
+    // keeps adding permissions will never get there.
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&default_repository())
+        .respond(
+            "PATCH",
+            "repos/o/r",
+            Fixture::error(403, "Resource not accessible by integration"),
+        )
+        .build();
+
+    let output = runner.run_with_env(
+        &["sync", "-R", "o/r", "--yes"],
+        &[("GITHUB_ACTIONS", "true")],
+    );
+    output.expect_status(1);
+
+    assert!(
+        output.stderr.contains("cannot be granted to GITHUB_TOKEN"),
+        "{}",
+        output.stderr
+    );
+}

@@ -1,0 +1,13 @@
+---
+source: tests/sync.rs
+expression: output.stderr
+---
+[TIMESTAMP] ERROR change failed resource=repository key=settings error=PATCH repos/o/r failed with HTTP 403: Resource not accessible by integration
+
+Some changes were refused for permission reasons.
+
+  Repository needs:
+    fine-grained token   Metadata: read, Administration: write
+    classic token        repo
+
+Run `gh settings doctor` for the full picture.

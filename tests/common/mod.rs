@@ -469,6 +469,9 @@ pub fn filters() -> Vec<(&'static str, &'static str)> {
             "[CONFIG]",
         ),
         (r"\d+(\.\d+)?(ms|s)\b", "[DURATION]"),
+        // Tracing writes an RFC 3339 timestamp to stderr, so any snapshot of
+        // stderr is otherwise different on every run.
+        (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z", "[TIMESTAMP]"),
     ]
 }
 

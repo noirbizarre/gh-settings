@@ -98,12 +98,8 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         println!("{}", ctx.json.apply(&report));
     } else {
         print!("{}", ctx.human.apply(&report));
-        // A 403 almost always means the wrong kind of token rather than a
-        // mistake in the configuration, so say so explicitly.
         if report.has_permission_failure() {
-            eprintln!();
-            eprintln!("Some changes were refused for permission reasons.");
-            eprintln!("Run `gh settings doctor` to see what this token can manage.");
+            eprint!("{}", permission_explanation(ctx, &report));
         }
     }
 
@@ -112,6 +108,53 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     } else {
         exit::FAILURE
     })
+}
+
+/// Explain a permission failure in terms of the permission that was missing.
+///
+/// A `403` almost always means the wrong kind of token rather than a mistake in
+/// the configuration. Telling the user to run `doctor` made them fetch
+/// information we were already holding: the failing resource is known here, and
+/// so is its [`Requirement`](crate::resources::Requirement). This names what to
+/// grant instead of where to go and look it up.
+fn permission_explanation(ctx: &Context, report: &ApplyReport) -> String {
+    use std::fmt::Write as _;
+
+    let mut out = String::new();
+    out.push('\n');
+    out.push_str("Some changes were refused for permission reasons.\n");
+
+    for id in report.permission_denied_resources() {
+        let Some(resource) = ctx.engine.registry().get(id) else {
+            continue;
+        };
+        let requirement = resource.requirement();
+
+        let _ = writeln!(out, "\n  {} needs:", id.title());
+        let _ = writeln!(
+            out,
+            "    fine-grained token   {}",
+            requirement.fine_grained_summary()
+        );
+        let _ = writeln!(
+            out,
+            "    classic token        {}",
+            requirement.classic_summary()
+        );
+
+        // The one thing no amount of granting will fix — but only worth saying
+        // when it could actually be the cause. Shown to someone using a
+        // personal access token it is a false lead, sending them to look for a
+        // setting that has no bearing on their failure.
+        if crate::github::auth::in_github_actions()
+            && let Some(note) = requirement.github_token_note
+        {
+            let _ = writeln!(out, "    note                 {note}");
+        }
+    }
+
+    out.push_str("\nRun `gh settings doctor` for the full picture.\n");
+    out
 }
 
 /// Compute a fresh plan from the configuration file.
