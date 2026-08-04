@@ -132,7 +132,7 @@ mod tests {
 
     fn findings(source: &str) -> Vec<String> {
         let settings: Settings = serde_norway::from_str(source).unwrap();
-        let spans = SpanIndex::build(source);
+        let spans = SpanIndex::build(crate::config::SourceId::ROOT, source);
         let ctx = ValidateCtx::new(&spans);
         settings
             .validate(&ctx)

@@ -148,13 +148,28 @@ impl<'a> ValidateCtx<'a> {
     }
 
     /// Span of a configuration path, for attaching to a [`Finding`].
-    pub fn span(&self, path: &str) -> Option<miette::SourceSpan> {
-        self.spans.resolve(path)
+    ///
+    /// `None` when no document declares the path — which is a bug in the caller,
+    /// not a user error, since a validation path is computed from a value that
+    /// was just read out of the document.
+    pub fn span(&self, path: &str) -> Option<crate::config::FileSpan> {
+        let found = self.spans.exact(path);
+        debug_assert!(
+            found.is_some() || !self.spans.has_root(),
+            "no node at `{path}`: the validation path does not match the document. \
+             Underlining the enclosing section instead is how this stayed hidden."
+        );
+        found
     }
 
     /// Span of a configuration *key*.
-    pub fn key_span(&self, path: &str) -> Option<miette::SourceSpan> {
-        self.spans.resolve_key(path)
+    pub fn key_span(&self, path: &str) -> Option<crate::config::FileSpan> {
+        let found = self.spans.exact_key(path);
+        debug_assert!(
+            found.is_some() || !self.spans.has_root(),
+            "no node at `{path}`: the validation path does not match the document"
+        );
+        found
     }
 
     /// Whether the document declares this path.

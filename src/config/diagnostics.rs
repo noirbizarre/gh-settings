@@ -4,7 +4,9 @@
 //! carries a span into the configuration file so `miette` can underline the exact
 //! offending node, and — wherever we can compute one — a concrete suggestion.
 
-use miette::{Diagnostic, LabeledSpan, SourceSpan};
+use miette::{Diagnostic, LabeledSpan};
+
+use super::source::FileSpan;
 
 /// How serious a finding is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -24,8 +26,8 @@ pub struct Finding {
     pub code: String,
     /// One-line description of what is wrong.
     pub message: String,
-    /// Where in the configuration the problem is.
-    pub span: Option<SourceSpan>,
+    /// Where in the configuration the problem is, and in which document.
+    pub span: Option<FileSpan>,
     /// Short text rendered under the underline.
     pub label: Option<String>,
     /// Actionable next step.
@@ -54,7 +56,7 @@ impl Finding {
     }
 
     /// Attach a source span.
-    pub fn at(mut self, span: impl Into<Option<SourceSpan>>) -> Self {
+    pub fn at(mut self, span: impl Into<Option<FileSpan>>) -> Self {
         self.span = span.into();
         self
     }
@@ -188,7 +190,7 @@ impl Diagnostic for Report {
                                 .clone()
                                 .unwrap_or_else(|| finding.message.clone()),
                         ),
-                        span,
+                        span.span,
                     )
                 })
             })

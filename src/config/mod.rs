@@ -83,7 +83,8 @@ pub enum ConfigError {
 /// Deserialization goes through `serde_path_to_error` so a failure yields the
 /// field path, which the span index turns into a precise underline (ADR-008).
 pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError> {
-    let spans = SpanIndex::build(source);
+    // One document today; `Config` learns to carry several in the next commit.
+    let spans = SpanIndex::build(SourceId::ROOT, source);
     let deserializer = serde_norway::Deserializer::from_str(source);
 
     let settings: Settings = match serde_path_to_error::deserialize(deserializer) {
@@ -105,6 +106,7 @@ pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError
             };
 
             let span = resolved
+                .map(|resolved| resolved.span)
                 .or_else(|| {
                     inner
                         .location()

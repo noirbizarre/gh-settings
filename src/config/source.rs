@@ -23,7 +23,9 @@ use miette::SourceSpan;
 ///
 /// A path would not do either: two inheritance chains can reach the same file,
 /// and a document fetched from another repository has no local path at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// Defaults to [`SourceId::ROOT`], so a `SpanIndex::default()` — used by tests
+/// that want no spans at all — still names a coherent document.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SourceId(u32);
 
 impl SourceId {

@@ -16,6 +16,8 @@ use std::collections::HashMap;
 use miette::SourceSpan;
 use saphyr::{LoadableYamlNode, MarkedYaml, YamlData};
 
+use super::source::{FileSpan, SourceId};
+
 /// A location in the source document, for both the key and the value of a node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Location {
@@ -28,34 +30,56 @@ pub struct Location {
     pub key: Option<SourceSpan>,
 }
 
-/// Maps dotted field paths to source spans.
+/// Maps dotted field paths to source spans, for one document.
 #[derive(Debug, Clone, Default)]
 pub struct SpanIndex {
+    /// Which document these offsets index into.
+    source: SourceId,
     entries: HashMap<String, Location>,
     /// Span of the whole document, used as a fallback.
     root: Option<SourceSpan>,
 }
 
 impl SpanIndex {
-    /// Build an index by parsing `source` with `saphyr`.
+    /// Build an index over `source`, tagged with the document it came from.
     ///
     /// A parse failure yields an empty index rather than an error: the serde pass
     /// will produce the user-facing syntax error, and it does so with a better
     /// message. This function's only job is to enrich, never to gate.
-    pub fn build(source: &str) -> Self {
+    pub fn build(id: SourceId, source: &str) -> Self {
         let Ok(documents) = MarkedYaml::load_from_str(source) else {
-            return Self::default();
+            return Self {
+                source: id,
+                ..Self::default()
+            };
         };
         let Some(document) = documents.first() else {
-            return Self::default();
+            return Self {
+                source: id,
+                ..Self::default()
+            };
         };
 
         let mut index = Self {
+            source: id,
             entries: HashMap::new(),
             root: Some(span_of(document)),
         };
         index.walk(document, &mut Vec::new(), None);
         index
+    }
+
+    /// The document this index describes.
+    pub fn source(&self) -> SourceId {
+        self.source
+    }
+
+    /// Whether a document was successfully parsed into this index.
+    ///
+    /// `false` for a default or malformed-input index, where every lookup misses
+    /// for reasons that have nothing to do with the path being wrong.
+    pub fn has_root(&self) -> bool {
+        self.root.is_some()
     }
 
     /// Recursively record every node's span, keyed by its path.
@@ -93,33 +117,51 @@ impl SpanIndex {
         self.entries.get(path).copied()
     }
 
+    /// Span of a node that must exist. `None` means the path is wrong.
+    ///
+    /// Unlike [`resolve`](Self::resolve) this never walks up to an ancestor.
+    /// Hand-written validation knows the exact path it means, so a miss is a bug
+    /// in the path rather than a reason to underline the enclosing section — and
+    /// underlining the section is how a wrong path used to pass for a right one.
+    pub fn exact(&self, path: &str) -> Option<FileSpan> {
+        self.get(path)
+            .map(|location| FileSpan::new(self.source, location.value))
+    }
+
+    /// Key span of a node that must exist. `None` means the path is wrong.
+    pub fn exact_key(&self, path: &str) -> Option<FileSpan> {
+        self.get(path)
+            .map(|location| FileSpan::new(self.source, location.key.unwrap_or(location.value)))
+    }
+
     /// Span for a path, falling back to the nearest known ancestor.
     ///
     /// `serde_path_to_error` sometimes reports a path one level deeper than any
     /// node that actually exists in the document — for instance a missing field
     /// reports `repository.description` when only `repository` is present. Walking
     /// up keeps the underline useful instead of dropping it entirely.
-    pub fn resolve(&self, path: &str) -> Option<SourceSpan> {
+    ///
+    /// That fallback is right for serde paths and wrong for everything else, so
+    /// this is deliberately not what validation calls; see [`exact`](Self::exact).
+    pub fn resolve(&self, path: &str) -> Option<FileSpan> {
         if let Some(location) = self.get(path) {
-            return Some(location.value);
+            return Some(FileSpan::new(self.source, location.value));
         }
 
         let mut remaining = path;
         while let Some((parent, _)) = remaining.rsplit_once('.') {
             if let Some(location) = self.get(parent) {
-                return Some(location.value);
+                return Some(FileSpan::new(self.source, location.value));
             }
             remaining = parent;
         }
 
-        self.root
+        self.root.map(|span| FileSpan::new(self.source, span))
     }
 
     /// Span of the key at `path`, falling back to its value span.
-    pub fn resolve_key(&self, path: &str) -> Option<SourceSpan> {
-        self.get(path)
-            .map(|location| location.key.unwrap_or(location.value))
-            .or_else(|| self.resolve(path))
+    pub fn resolve_key(&self, path: &str) -> Option<FileSpan> {
+        self.exact_key(path).or_else(|| self.resolve(path))
     }
 
     /// Whether the document declared anything at `path`.
@@ -153,13 +195,17 @@ mod tests {
 
     const SOURCE: &str = "repository:\n  description: hello world\n  private: false\nlabels:\n  - name: bug\n    color: d73a4a\n";
 
-    fn slice(span: SourceSpan) -> &'static str {
+    fn slice(span: FileSpan) -> &'static str {
         &SOURCE[span.offset()..span.offset() + span.len()]
+    }
+
+    fn index() -> SpanIndex {
+        SpanIndex::build(SourceId::ROOT, SOURCE)
     }
 
     #[test]
     fn indexes_nested_scalars() {
-        let index = SpanIndex::build(SOURCE);
+        let index = index();
         assert_eq!(
             slice(index.resolve("repository.description").unwrap()),
             "hello world"
@@ -169,30 +215,67 @@ mod tests {
 
     #[test]
     fn indexes_sequence_items() {
-        let index = SpanIndex::build(SOURCE);
+        let index = index();
         assert_eq!(slice(index.resolve("labels.0.name").unwrap()), "bug");
         assert_eq!(slice(index.resolve("labels.0.color").unwrap()), "d73a4a");
     }
 
     #[test]
     fn keys_and_values_are_distinguished() {
-        let index = SpanIndex::build(SOURCE);
+        let index = index();
         let location = index.get("repository.description").unwrap();
-        assert_eq!(slice(location.value), "hello world");
-        assert_eq!(slice(location.key.unwrap()), "description");
+        assert_eq!(
+            slice(FileSpan::new(SourceId::ROOT, location.value)),
+            "hello world"
+        );
+        assert_eq!(
+            slice(FileSpan::new(SourceId::ROOT, location.key.unwrap())),
+            "description"
+        );
     }
 
     #[test]
     fn unknown_paths_fall_back_to_the_nearest_ancestor() {
-        let index = SpanIndex::build(SOURCE);
+        let index = index();
         // `homepage` is absent, so we should land on the `repository` mapping.
         let span = index.resolve("repository.homepage").unwrap();
         assert!(slice(span).starts_with("description:"));
     }
 
     #[test]
+    fn an_exact_lookup_of_an_unknown_path_finds_nothing() {
+        // The counterpart of the test above, and the reason both exist. The
+        // ancestor walk is right for serde, which reports paths deeper than any
+        // node present, and wrong for validation, which knows exactly what it
+        // means — there, a miss that silently became the enclosing section is
+        // how a wrong path passed for a right one.
+        let index = index();
+        assert!(index.exact("repository.homepage").is_none());
+        assert!(index.exact("labels.0.description").is_none());
+        assert!(index.exact("nonsense").is_none());
+    }
+
+    #[test]
+    fn every_span_names_the_document_it_came_from() {
+        let index = index();
+        assert_eq!(index.source(), SourceId::ROOT);
+        assert_eq!(
+            index.exact("repository.description").unwrap().source,
+            SourceId::ROOT
+        );
+    }
+
+    #[test]
+    fn an_index_over_nothing_reports_that_it_has_no_document() {
+        // What the debug assertion in `ValidateCtx` keys on: a miss here means
+        // "there was nothing to look in", not "the path is wrong".
+        assert!(!SpanIndex::default().has_root());
+        assert!(index().has_root());
+    }
+
+    #[test]
     fn a_malformed_document_yields_an_empty_index_not_an_error() {
-        let index = SpanIndex::build("repository:\n  - : : :\n\t bad");
+        let index = SpanIndex::build(SourceId::ROOT, "repository:\n  - : : :\n\t bad");
         assert!(index.resolve("repository.description").is_none() || index.root.is_some());
     }
 
