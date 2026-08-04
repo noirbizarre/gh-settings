@@ -1,0 +1,16 @@
+---
+source: tests/doctor.rs
+expression: output.stdout
+---
+Environment
+  ✔ gh CLI           gh version 2.62.0 (2024-01-01)
+  ✔ Authentication   github.com as tester
+  ✔ Token type       classic personal access token
+    Scopes           repo, read:org
+
+Resources
+  ✔ repository
+  ✔ topics
+  ✔ labels
+  ✔ autolinks
+  ✔ rulesets

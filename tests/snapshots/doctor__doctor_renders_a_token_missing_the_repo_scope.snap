@@ -1,0 +1,19 @@
+---
+source: tests/doctor.rs
+expression: "runner.run(&[\"doctor\", \"-R\", \"o/r\"]).stdout"
+---
+Environment
+  ✔ gh CLI           gh version 2.62.0 (2024-01-01)
+  ✔ Authentication   github.com as tester
+  ✔ Token type       classic personal access token
+    Scopes           gist
+
+Resources
+  ✘ repository  missing the `repo` scope
+  ✘ topics      missing the `repo` scope
+  ✘ labels      missing the `repo` scope
+  ✘ autolinks   missing the `repo` scope
+  ✘ rulesets    missing the `repo` scope
+
+→ Use a personal access token or a GitHub App installation token.
+  See https://noirbizarre.github.io/gh-settings/authentication/

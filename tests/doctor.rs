@@ -278,3 +278,55 @@ fn doctor_json_reports_the_actions_token_as_impossible() {
         .expect("labels");
     assert_eq!(labels["status"], "manageable");
 }
+
+// --- rendering --------------------------------------------------------------
+//
+// The assertions above check that individual facts appear. These lock the whole
+// table, because `doctor` is a diagnostic surface: what it *looks like* is the
+// product. They also guard the verdicts against the pre-flight work sharing
+// this logic — a change in either must show up as a snapshot diff rather than
+// silently.
+
+#[test]
+fn doctor_renders_a_healthy_classic_token() {
+    let runner = sandbox("ghp_x", Some("repo, read:org")).build();
+    let output = runner.run(&["doctor", "-R", "o/r"]);
+    output.expect_status(0);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn doctor_renders_a_token_missing_the_repo_scope() {
+    let runner = sandbox("ghp_x", Some("gist")).build();
+    assert_cli_snapshot!(runner.run(&["doctor", "-R", "o/r"]).stdout);
+}
+
+#[test]
+fn doctor_renders_a_fine_grained_token_the_admin_probe_vouches_for() {
+    // No scopes are reported, but the repository read says `permissions.admin`,
+    // so the verdict is earned rather than guessed.
+    let runner = sandbox("github_pat_x", None).build();
+    assert_cli_snapshot!(runner.run(&["doctor", "-R", "o/r"]).stdout);
+}
+
+#[test]
+fn doctor_renders_the_unknown_verdict() {
+    // The honest outcome, and the one most likely to regress into a guess. A
+    // fine-grained token reports no scopes, and here the admin probe cannot
+    // answer either — `probe_admin` returns `None` on a 404 rather than
+    // `false`, because "I cannot see it" is not "you may not touch it".
+    //
+    // Nothing may claim to know what this token can do.
+    let runner = sandbox("github_pat_x", None)
+        .respond("GET", "repos/o/r", Fixture::error(404, "Not Found"))
+        .build();
+    let output = runner.run(&["doctor", "-R", "o/r"]);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn doctor_renders_the_actions_token() {
+    let runner = sandbox("ghs_actionstoken", Some("issues")).build();
+    let output = runner.run_with_env(&["doctor", "-R", "o/r"], &[("GITHUB_ACTIONS", "true")]);
+    assert_cli_snapshot!(output.stdout);
+}

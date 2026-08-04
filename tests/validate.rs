@@ -17,9 +17,7 @@ fn validate(config: &str) -> common::Output {
 
 macro_rules! assert_snapshot {
     ($output:expr) => {
-        insta::with_settings!({ filters => common::filters() }, {
-            insta::assert_snapshot!($output);
-        });
+        assert_cli_snapshot!($output)
     };
 }
 

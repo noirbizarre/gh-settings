@@ -714,3 +714,60 @@ fn body_of(request: &str) -> serde_json::Value {
         .unwrap_or_else(|| panic!("request has no body: {request}"));
     serde_json::from_str(body).unwrap_or_else(|error| panic!("body is not JSON ({error}): {body}"))
 }
+
+// --- rendering --------------------------------------------------------------
+//
+// `plan --verbose` is the field-level before/after view, and the stated reason
+// there is no separate `diff` command — which makes it a product surface with
+// no snapshot until now.
+
+#[test]
+fn plan_renders_pending_changes() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: feature\n    color: a2eeef\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(2);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn plan_renders_field_level_changes_when_verbose() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: ff0000\n    description: Broken\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r", "--verbose"]);
+    output.expect_status(2);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn plan_renders_an_up_to_date_repository() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n    description: Something isn't working\n",
+        )
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(0);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn sync_renders_what_it_applied() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: feature\n    color: a2eeef\n")
+        .get("repos/o/r/labels", LABELS)
+        .respond("POST", "repos/o/r/labels", Fixture::created("{}"))
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+    assert_cli_snapshot!(output.stdout);
+}

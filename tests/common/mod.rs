@@ -477,6 +477,25 @@ pub fn read(root: &Path, relative: &str) -> String {
     std::fs::read_to_string(PathBuf::from(root).join(relative)).unwrap_or_default()
 }
 
+/// Snapshot command output with the stabilising filters already applied.
+///
+/// Shared rather than redefined per suite because forgetting [`filters`] does
+/// not fail loudly: the snapshot simply captures a machine-specific temporary
+/// path, and only breaks on someone else's machine.
+#[macro_export]
+macro_rules! assert_cli_snapshot {
+    ($output:expr) => {
+        insta::with_settings!({ filters => $crate::common::filters() }, {
+            insta::assert_snapshot!($output);
+        });
+    };
+    ($name:expr, $output:expr) => {
+        insta::with_settings!({ filters => $crate::common::filters() }, {
+            insta::assert_snapshot!($name, $output);
+        });
+    };
+}
+
 #[cfg(test)]
 mod harness_tests {
     use super::*;

@@ -1,0 +1,5 @@
+---
+source: tests/sync.rs
+expression: output.stdout
+---
+✔ o/r is up to date.

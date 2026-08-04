@@ -1,0 +1,16 @@
+---
+source: tests/doctor.rs
+expression: "runner.run(&[\"doctor\", \"-R\", \"o/r\"]).stdout"
+---
+Environment
+  ✔ gh CLI           gh version 2.62.0 (2024-01-01)
+  ✔ Authentication   github.com as tester
+  ✔ Token type       fine-grained personal access token
+    Scopes           not reported by this token type
+
+Resources
+  ✔ repository
+  ✔ topics
+  ✔ labels
+  ✔ autolinks
+  ✔ rulesets

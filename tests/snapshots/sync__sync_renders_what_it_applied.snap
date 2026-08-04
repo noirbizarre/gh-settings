@@ -1,0 +1,14 @@
+---
+source: tests/sync.rs
+expression: output.stdout
+---
+Plan for o/r
+
+Labels
+  + create label feature
+
+1 to create.
+
+✔ create label feature
+
+✔ applied 1 change.

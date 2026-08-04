@@ -1,0 +1,19 @@
+---
+source: tests/doctor.rs
+expression: output.stdout
+---
+Environment
+  ✔ gh CLI           gh version 2.62.0 (2024-01-01)
+  ✔ Authentication   github.com as tester
+  ! Token type       Actions GITHUB_TOKEN
+    Scopes           issues
+
+Resources
+  ✘ repository  requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ topics      requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✔ labels
+  ✘ autolinks   requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ rulesets    requires Administration: write, which cannot be granted to GITHUB_TOKEN
+
+→ Use a personal access token or a GitHub App installation token.
+  See https://noirbizarre.github.io/gh-settings/authentication/

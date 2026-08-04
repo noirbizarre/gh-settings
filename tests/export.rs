@@ -154,3 +154,23 @@ fn only_restricts_what_is_exported() {
     assert!(output.stdout.contains("labels:"), "{}", output.stdout);
     assert!(!output.stdout.contains("autolinks:"), "{}", output.stdout);
 }
+
+// --- rendering --------------------------------------------------------------
+
+#[test]
+fn export_renders_a_populated_repository() {
+    // The file a user's first migration produces. Field order, quoting and the
+    // schema annotation are all part of it.
+    let runner = populated().build();
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn export_renders_a_repository_with_nothing_to_export() {
+    let runner = Sandbox::new().repository(&default_repository()).build();
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+    assert_cli_snapshot!(output.stdout);
+}
