@@ -5,6 +5,11 @@
 //! to a `403`. Nothing about permissions is written in prose anywhere else, so the
 //! four cannot drift apart.
 //!
+//! [`Requirement::verdict`] is the one place a credential is judged. `doctor`
+//! reports it, and `sync` refuses on it — if the two disagreed, `doctor` would be
+//! telling users something `sync` does not act on, which is worse than either
+//! being wrong alone.
+//!
 //! # Verification status
 //!
 //! Fine-grained permission mappings are taken from GitHub's REST reference. Where
@@ -12,6 +17,8 @@
 //! [`Confidence::Unverified`] and reported as such, rather than asserted.
 
 use serde::Serialize;
+
+use crate::github::auth::{AuthStatus, TokenKind};
 
 /// Access level on a fine-grained permission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -136,6 +143,87 @@ impl Requirement {
     pub fn classic_summary(&self) -> String {
         self.classic.join(", ")
     }
+
+    /// Judge a credential against this requirement.
+    ///
+    /// The only place a token is assessed. `doctor` renders the result and
+    /// `sync` refuses to start on [`Capability::Impossible`], so a change here
+    /// moves both at once, by construction.
+    ///
+    /// Every branch that cannot be established from evidence returns
+    /// [`Capability::Unknown`]. That is not a gap to be filled in later: a
+    /// wrong "impossible" blocks a token that would have worked, and the user
+    /// has no way to appeal it. Refusing only when certain is the whole design.
+    pub fn verdict(&self, auth: Option<&AuthStatus>) -> Capability {
+        let Some(auth) = auth else {
+            return Capability::Unknown;
+        };
+
+        match auth.token_kind {
+            // The one case we can state with certainty. The workflow
+            // `permissions:` block has no `administration` key, so this is not
+            // a scope the user forgot to grant.
+            TokenKind::ActionsGitHubToken if !self.github_token_capable => Capability::Impossible(
+                self.github_token_note
+                    .unwrap_or("not available to GITHUB_TOKEN"),
+            ),
+            TokenKind::ActionsGitHubToken => Capability::Manageable,
+
+            // Classic tokens advertise their scopes, so we can be exact.
+            _ => match self
+                .classic
+                .iter()
+                .map(|scope| auth.scopes.grants(scope))
+                .collect::<Option<Vec<bool>>>()
+            {
+                Some(granted) if granted.iter().all(|granted| *granted) => Capability::Manageable,
+                Some(_) => Capability::Impossible("missing the `repo` scope"),
+                // Fine-grained and App tokens do not report scopes. Fall back to
+                // whether the token has admin rights on this repository, and say
+                // "unknown" when even that could not be established.
+                None => match auth.admin_on_target {
+                    Some(true) => Capability::Manageable,
+                    Some(false) if !self.github_token_capable => {
+                        Capability::Impossible("the token has no admin rights on this repository")
+                    }
+                    _ => Capability::Unknown,
+                },
+            },
+        }
+    }
+}
+
+/// Whether a resource can be managed with the current credential.
+///
+/// Lives beside [`Requirement`] rather than in `output` because it is a verdict,
+/// not a rendering: `sync` acts on it without printing anything.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Capability {
+    /// It can be managed.
+    Manageable,
+    /// It definitely cannot, with the reason.
+    Impossible(&'static str),
+    /// We cannot tell — reported honestly rather than guessed.
+    Unknown,
+}
+
+impl Capability {
+    /// Whether this verdict is certain enough to refuse a write on.
+    ///
+    /// [`Capability::Unknown`] deliberately answers `false`: an unintrospectable
+    /// token must be allowed to try, so that GitHub's own error is what the user
+    /// sees rather than our guess about it.
+    pub fn is_certainly_impossible(&self) -> bool {
+        matches!(self, Self::Impossible(_))
+    }
+
+    /// The reason, when there is one.
+    pub fn reason(&self) -> Option<&'static str> {
+        match self {
+            Self::Impossible(reason) => Some(reason),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -201,5 +289,134 @@ mod tests {
         };
         assert!(requirement.has_unverified());
         assert!(!Requirement::ISSUES.has_unverified());
+    }
+
+    mod verdict {
+        use super::{AuthStatus, Capability, Requirement, TokenKind};
+        use crate::github::auth::Scopes;
+        use pretty_assertions::assert_eq;
+
+        fn auth(
+            token_kind: TokenKind,
+            scopes: Scopes,
+            admin_on_target: Option<bool>,
+        ) -> AuthStatus {
+            AuthStatus {
+                hostname: "github.com".into(),
+                account: Some("tester".into()),
+                token_kind,
+                scopes,
+                admin_on_target,
+            }
+        }
+
+        fn classic(scopes: &[&str]) -> AuthStatus {
+            auth(
+                TokenKind::ClassicPat,
+                Scopes::Known(scopes.iter().map(|s| (*s).to_string()).collect()),
+                None,
+            )
+        }
+
+        #[test]
+        fn a_classic_token_with_the_scope_can_manage_everything() {
+            assert_eq!(
+                Requirement::ADMINISTRATION.verdict(Some(&classic(&["repo"]))),
+                Capability::Manageable
+            );
+        }
+
+        #[test]
+        fn a_classic_token_without_the_scope_is_certainly_blocked() {
+            // Scopes are advertised, so this is one of the few cases we may
+            // state outright.
+            let verdict = Requirement::ADMINISTRATION.verdict(Some(&classic(&["gist"])));
+            assert!(verdict.is_certainly_impossible());
+            assert_eq!(verdict.reason(), Some("missing the `repo` scope"));
+        }
+
+        #[test]
+        fn the_actions_token_cannot_reach_administration() {
+            let verdict = Requirement::ADMINISTRATION.verdict(Some(&auth(
+                TokenKind::ActionsGitHubToken,
+                Scopes::Unknown,
+                None,
+            )));
+            assert_eq!(
+                verdict.reason(),
+                Requirement::ADMINISTRATION.github_token_note,
+                "the verdict must carry the resource's own explanation"
+            );
+        }
+
+        #[test]
+        fn the_actions_token_can_still_manage_labels() {
+            // The documented labels-only CI workflow depends on this.
+            assert_eq!(
+                Requirement::ISSUES.verdict(Some(&auth(
+                    TokenKind::ActionsGitHubToken,
+                    Scopes::Unknown,
+                    None
+                ))),
+                Capability::Manageable
+            );
+        }
+
+        #[test]
+        fn an_unintrospectable_token_is_unknown_rather_than_blocked() {
+            // A fine-grained token reports no scopes, and the repository read
+            // failed, so `admin_on_target` is `None`. Anything other than
+            // `Unknown` here would have `sync` refuse a token that may well
+            // work, with no way for the user to overrule it.
+            let verdict = Requirement::ADMINISTRATION.verdict(Some(&auth(
+                TokenKind::FineGrainedPat,
+                Scopes::Unknown,
+                None,
+            )));
+            assert_eq!(verdict, Capability::Unknown);
+            assert!(
+                !verdict.is_certainly_impossible(),
+                "an unknown verdict must never block a write"
+            );
+        }
+
+        #[test]
+        fn no_credential_at_all_is_unknown() {
+            let verdict = Requirement::ADMINISTRATION.verdict(None);
+            assert_eq!(verdict, Capability::Unknown);
+            assert!(!verdict.is_certainly_impossible());
+        }
+
+        #[test]
+        fn the_admin_probe_settles_a_token_that_reports_no_scopes() {
+            assert_eq!(
+                Requirement::ADMINISTRATION.verdict(Some(&auth(
+                    TokenKind::FineGrainedPat,
+                    Scopes::Unknown,
+                    Some(true)
+                ))),
+                Capability::Manageable
+            );
+        }
+
+        #[test]
+        fn a_token_without_admin_rights_cannot_manage_administration() {
+            let verdict = Requirement::ADMINISTRATION.verdict(Some(&auth(
+                TokenKind::FineGrainedPat,
+                Scopes::Unknown,
+                Some(false),
+            )));
+            assert!(verdict.is_certainly_impossible());
+
+            // ...but labels do not need admin, so the same credential is fine.
+            assert_eq!(
+                Requirement::ISSUES.verdict(Some(&auth(
+                    TokenKind::FineGrainedPat,
+                    Scopes::Unknown,
+                    Some(false)
+                ))),
+                Capability::Unknown
+            );
+        }
     }
 }

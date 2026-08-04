@@ -20,7 +20,7 @@ pub mod rulesets;
 pub mod topics;
 
 pub use change::{Change, Counts, FieldDiff, Op};
-pub use requirement::{Access, Requirement};
+pub use requirement::{Access, Capability, Requirement};
 
 use std::fmt;
 

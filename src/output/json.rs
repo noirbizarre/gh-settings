@@ -9,7 +9,7 @@ use crate::config::Finding;
 use crate::engine::{ApplyReport, Plan};
 use crate::github::AuthStatus;
 use crate::github::auth::Scopes;
-use crate::output::human::Capability;
+use crate::resources::Capability;
 use crate::resources::{Counts, ResourceId};
 
 /// Renders plans and reports as JSON.
@@ -220,6 +220,7 @@ impl JsonRenderer {
         serde_json::to_string_pretty(&output)
             .unwrap_or_else(|error| panic!("a report should always serialise: {error}"))
     }
+
 }
 
 /// Stable machine-readable key for a credential kind.

@@ -4,7 +4,7 @@ use std::fmt::Write as _;
 
 use crate::engine::{ApplyReport, Plan};
 use crate::github::{AuthStatus, TokenKind};
-use crate::resources::{Change, Counts, Op};
+use crate::resources::{Capability, Change, Counts, Op};
 
 use super::theme::Theme;
 
@@ -293,17 +293,6 @@ impl HumanRenderer {
 
         out
     }
-}
-
-/// Whether a resource can be managed with the current credential.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Capability {
-    /// It can be managed.
-    Manageable,
-    /// It definitely cannot, with the reason.
-    Impossible(&'static str),
-    /// We cannot tell — reported honestly rather than guessed.
-    Unknown,
 }
 
 #[cfg(test)]
