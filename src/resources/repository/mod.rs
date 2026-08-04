@@ -86,6 +86,14 @@ pub struct Current {
     /// Default branch name.
     #[serde(default)]
     pub default_branch: Option<String>,
+    /// Whether anonymous Git read access is enabled.
+    ///
+    /// `Option`, unlike its neighbours: GitHub Enterprise Server reports the
+    /// field and github.com omits it entirely. Defaulting it to `false` would
+    /// make every github.com repository look like it had the feature turned off,
+    /// which is a different claim from not having it.
+    #[serde(default)]
+    pub anonymous_access_enabled: Option<bool>,
     /// Whether the repository is archived.
     #[serde(default)]
     pub archived: bool,
@@ -95,6 +103,38 @@ pub struct Current {
 }
 
 impl Current {
+    /// A normalised copy, safe to compare against a normalised counterpart.
+    ///
+    /// Every other resource normalises what it reads inside `current()`, which
+    /// is what the trait promises. This one did not, and normalised two of its
+    /// fields inside the diff instead — so a stray space in `default_branch`, or
+    /// a merge-commit enum GitHub spelled in a different case, was a difference
+    /// that could never be resolved and a plan that never came out empty.
+    pub fn normalized(mut self) -> Self {
+        fn text(value: Option<String>) -> Option<String> {
+            value
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        }
+
+        // The API spells these in SCREAMING_SNAKE_CASE, and so does the schema.
+        // Upper-casing costs nothing and removes a whole class of phantom diff.
+        fn enumeration(value: Option<String>) -> Option<String> {
+            text(value).map(|value| value.to_uppercase())
+        }
+
+        self.description = text(self.description);
+        self.homepage = text(self.homepage);
+        self.default_branch = text(self.default_branch);
+        self.squash_merge_commit_title = enumeration(self.squash_merge_commit_title);
+        self.squash_merge_commit_message = enumeration(self.squash_merge_commit_message);
+        self.merge_commit_title = enumeration(self.merge_commit_title);
+        self.merge_commit_message = enumeration(self.merge_commit_message);
+        self
+    }
+
     /// Whether a security feature is enabled.
     ///
     /// The API shape is `{"secret_scanning": {"status": "enabled"}}`; an absent
@@ -146,7 +186,8 @@ impl Resource for Repository {
         client: &dyn GitHubClient,
         target: &Target,
     ) -> GitHubResult<Self::Current> {
-        client.send(Request::get(target.endpoint(""))).await
+        let current: Current = client.send(Request::get(target.endpoint(""))).await?;
+        Ok(current.normalized())
     }
 
     fn diff(
@@ -250,6 +291,24 @@ impl Resource for Repository {
             fields.push(FieldDiff::changed("archived", "false", "true"));
         }
 
+        // Not in the array above because the current value is genuinely optional:
+        // github.com does not report this field at all. Sending it anyway is the
+        // only way to manage it on Enterprise Server, and it was previously
+        // accepted by the schema, documented, and then silently ignored.
+        if let Some(desired_value) = desired.anonymous_access_enabled
+            && current.anonymous_access_enabled != Some(desired_value)
+        {
+            body.insert("anonymous_access_enabled".into(), json!(desired_value));
+            fields.push(FieldDiff::changed(
+                "anonymous_access_enabled",
+                current
+                    .anonymous_access_enabled
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "(not reported)".into()),
+                desired_value.to_string(),
+            ));
+        }
+
         // Enum-valued merge commit options.
         let enums: [(&str, Option<String>, Option<&String>); 4] = [
             (
@@ -292,8 +351,12 @@ impl Resource for Repository {
             }
         }
 
-        if let Some(default_branch) = &desired.default_branch
-            && Some(default_branch) != current.default_branch.as_ref()
+        // Both sides normalised: `current` was trimmed on the way in, so trim
+        // what the user wrote too rather than comparing a trimmed value against
+        // an untrimmed one.
+        if let Some(default_branch) = desired.default_branch.as_deref().map(str::trim)
+            && !default_branch.is_empty()
+            && Some(default_branch) != current.default_branch.as_deref()
         {
             body.insert("default_branch".into(), json!(default_branch));
             fields.push(FieldDiff::changed(
@@ -423,7 +486,9 @@ impl Resource for Repository {
             merge_commit_title: current.merge_commit_title.as_deref().and_then(parse_enum),
             merge_commit_message: current.merge_commit_message.as_deref().and_then(parse_enum),
             default_branch: current.default_branch.clone(),
-            anonymous_access_enabled: None,
+            // Only present when GitHub reported it, which means Enterprise
+            // Server. Exporting `false` on github.com would invent a setting.
+            anonymous_access_enabled: current.anonymous_access_enabled,
             // Never export `archived`: doing so would put a one-way, destructive
             // flag into a file people copy between repositories.
             archived: None,

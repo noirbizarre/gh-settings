@@ -10,7 +10,11 @@ fn desired(source: &str) -> RepositorySettings {
 }
 
 fn current(value: Value) -> Current {
-    serde_json::from_value(value).unwrap()
+    // Through `normalized`, as the real `current()` does: a test that compares
+    // against an unnormalised value is not testing what the tool runs.
+    serde_json::from_value::<Current>(value)
+        .unwrap()
+        .normalized()
 }
 
 fn plan(desired_source: &str, current_value: Value) -> Vec<Change> {
@@ -193,4 +197,89 @@ fn exports_never_include_archived() {
     };
     assert!(current.archived);
     assert_eq!(exported.archived, None);
+}
+
+#[test]
+fn every_boolean_setting_is_actually_diffed() {
+    // `anonymous_access_enabled` was declared, published in the schema and
+    // documented, and then never looked at: writing it planned nothing and
+    // applied nothing. The merge layer has a compile-time guard against exactly
+    // this; the diff had none, so here is one.
+    let desired: RepositorySettings = serde_json::from_value(json!({
+        // All `true`, against a repository where every one of them is false, so
+        // each field is a change on its own and none can hide behind a default.
+        "private": true,
+        "has_issues": true,
+        "has_wiki": true,
+        "has_projects": true,
+        "has_discussions": true,
+        "is_template": true,
+        "allow_merge_commit": true,
+        "allow_squash_merge": true,
+        "allow_rebase_merge": true,
+        "allow_auto_merge": true,
+        "allow_update_branch": true,
+        "delete_branch_on_merge": true,
+        "anonymous_access_enabled": true,
+        "archived": true,
+    }))
+    .unwrap();
+
+    // Every boolean the user could have written, taken from the type itself so
+    // a field added later is caught here rather than shipped inert.
+    let declared: Vec<String> = serde_json::to_value(&desired)
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(_, value)| value.is_boolean())
+        .map(|(name, _)| name.clone())
+        .collect();
+    assert!(!declared.is_empty());
+
+    let changes = Repository.diff(&desired, &current(json!({})), &PruneOpts::default());
+    let patched = body(&changes[0]);
+
+    for name in declared {
+        assert!(
+            patched.get(&name).is_some(),
+            "`{name}` is accepted by the schema but never reaches the API"
+        );
+    }
+}
+
+#[test]
+fn a_default_branch_is_compared_with_both_sides_trimmed() {
+    assert!(
+        plan(
+            "default_branch: ' main '",
+            json!({"default_branch": "main"})
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn merge_commit_enums_are_compared_case_insensitively() {
+    // GitHub is consistent about SCREAMING_SNAKE_CASE today, but a value that
+    // arrives in another case must not become a change that can never be
+    // applied away.
+    assert!(
+        plan(
+            "merge_commit_title: PR_TITLE",
+            json!({"merge_commit_title": "pr_title"})
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn anonymous_access_is_only_exported_when_github_reports_it() {
+    // github.com omits the field; Enterprise Server sends it. Exporting `false`
+    // everywhere would invent a setting nobody has.
+    assert_eq!(current(json!({})).anonymous_access_enabled, None);
+    assert_eq!(
+        current(json!({"anonymous_access_enabled": true})).anonymous_access_enabled,
+        Some(true)
+    );
 }
