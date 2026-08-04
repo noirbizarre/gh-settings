@@ -28,7 +28,7 @@ pub fn run(
     let findings = engine.validate(config, only);
 
     if json {
-        println!("{}", renderer.validation(&findings));
+        println!("{}", renderer.validation(&config.sources, &findings));
         let failed = findings.iter().any(crate::config::Finding::is_error)
             || (args.strict && !findings.is_empty());
         return Ok(if failed { exit::FAILURE } else { exit::SUCCESS });

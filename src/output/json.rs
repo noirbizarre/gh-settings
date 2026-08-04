@@ -5,7 +5,7 @@
 
 use serde::Serialize;
 
-use crate::config::Finding;
+use crate::config::{Finding, Sources};
 use crate::engine::{ApplyReport, Plan};
 use crate::github::AuthStatus;
 use crate::github::auth::Scopes;
@@ -35,8 +35,14 @@ pub struct FindingOutput<'a> {
     /// Human-readable message.
     pub message: &'a str,
     /// Byte offset of the offending node, when known.
+    ///
+    /// Only meaningful together with `file`: once a configuration can inherit
+    /// from another document, an offset alone does not say what it indexes into.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<usize>,
+    /// Document the offset indexes into.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<&'a str>,
     /// Actionable hint.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub help: Option<&'a str>,
@@ -179,7 +185,10 @@ impl JsonRenderer {
     }
 
     /// Render validation findings.
-    pub fn validation(&self, findings: &[Finding]) -> String {
+    ///
+    /// Takes the documents as well as the findings so each offset can name the
+    /// text it belongs to.
+    pub fn validation<'a>(&self, sources: &'a Sources, findings: &'a [Finding]) -> String {
         let output = ValidationOutput {
             valid: !findings.iter().any(Finding::is_error),
             findings: findings
@@ -193,6 +202,9 @@ impl JsonRenderer {
                     code: &finding.code,
                     message: &finding.message,
                     offset: finding.span.map(|span| span.offset()),
+                    file: finding
+                        .span
+                        .map(|span| sources.get(span.source).name.as_str()),
                     help: finding.help.as_deref(),
                 })
                 .collect(),
@@ -301,13 +313,19 @@ mod tests {
         assert_eq!(value["changes"].as_array().unwrap().len(), 0);
     }
 
+    /// A single-document registry, for findings that carry no span.
+    fn sources() -> Sources {
+        Sources::root("settings.yml", "version: 1\n").0
+    }
+
     #[test]
     fn validation_reports_validity_separately_from_warnings() {
         let findings = vec![
             Finding::warning("a::b", "just so you know"),
             Finding::error("c::d", "this is wrong").help("try this"),
         ];
-        let value: Value = serde_json::from_str(&JsonRenderer.validation(&findings)).unwrap();
+        let value: Value =
+            serde_json::from_str(&JsonRenderer.validation(&sources(), &findings)).unwrap();
 
         assert_eq!(value["valid"], false);
         assert_eq!(value["findings"][0]["severity"], "warning");
@@ -316,15 +334,49 @@ mod tests {
     }
 
     #[test]
+    fn a_finding_names_the_document_its_offset_belongs_to() {
+        use crate::config::FileSpan;
+        use miette::SourceSpan;
+
+        let (mut registry, root) = Sources::root("local.yml", "version: 1\n");
+        let base = registry.push("acme/.github@v1", "labels: []\n");
+
+        let findings = vec![
+            Finding::error("a::b", "local problem")
+                .at(FileSpan::new(root, SourceSpan::new(0.into(), 7usize))),
+            Finding::error("c::d", "inherited problem")
+                .at(FileSpan::new(base, SourceSpan::new(0.into(), 6usize))),
+        ];
+
+        let value: Value =
+            serde_json::from_str(&JsonRenderer.validation(&registry, &findings)).unwrap();
+
+        // Both offsets are small numbers that index into either document. Only
+        // `file` tells a consumer which one to open.
+        assert_eq!(value["findings"][0]["file"], "local.yml");
+        assert_eq!(value["findings"][1]["file"], "acme/.github@v1");
+    }
+
+    #[test]
+    fn a_finding_without_a_span_names_no_document() {
+        let findings = vec![Finding::warning("a::b", "no location")];
+        let value: Value =
+            serde_json::from_str(&JsonRenderer.validation(&sources(), &findings)).unwrap();
+        assert!(value["findings"][0].get("file").is_none());
+        assert!(value["findings"][0].get("offset").is_none());
+    }
+
+    #[test]
     fn warnings_alone_are_still_valid() {
         let findings = vec![Finding::warning("a::b", "just so you know")];
-        let value: Value = serde_json::from_str(&JsonRenderer.validation(&findings)).unwrap();
+        let value: Value =
+            serde_json::from_str(&JsonRenderer.validation(&sources(), &findings)).unwrap();
         assert_eq!(value["valid"], true);
     }
 
     #[test]
     fn an_empty_validation_is_valid() {
-        let value: Value = serde_json::from_str(&JsonRenderer.validation(&[])).unwrap();
+        let value: Value = serde_json::from_str(&JsonRenderer.validation(&sources(), &[])).unwrap();
         assert_eq!(value["valid"], true);
     }
 }
