@@ -2,7 +2,15 @@
 
 ## Status
 
-Accepted.
+Accepted. Extended by [ADR-016](016-diagnostic-provenance.md), which adds
+document identity to every span and splits the fallback described below into two
+methods — the ancestor walk is right for serde paths and wrong for hand-written
+validation.
+
+The record below names `serde_yaml_ng`; the implementation uses `serde_norway`.
+The decision — deserialize through `serde_path_to_error` and look the reported
+path up in a `saphyr` index — is unaffected, and the text is left as written
+because these records are not edited after acceptance.
 
 ## Context
 

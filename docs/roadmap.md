@@ -98,24 +98,31 @@ cannot disagree about what a token can do.
       [GitHub Actions](actions.md).
 
 - [ ] **Inheritance (`extends:`)** — share labels, autolinks and rulesets across
-      repositories. Decided: inherit from another repository, ref-pinnable
-      (`acme/.github@v1`); merge collections by item identity with the child
-      overriding field by field; **`prune` never inherits**, because otherwise
-      editing one shared file would start deleting across every repository that
-      extends it, decided by someone who does not own them.
+      repositories.
 
-      The load-bearing risk is not the merge, it is the diagnostics. A
-      `SourceSpan` is a byte offset with no file identity, so an offset from the
-      base file is still a *valid* index into the local one: a finding about the
-      shared file would render a confident underline pointing at unrelated text.
-      It fails silently rather than erroring. `Finding`, `Report`, `SpanIndex`
-      and `ValidateCtx` all assume a single source today and need provenance
-      before this ships.
+      **Unblocked.** The diagnostics were the load-bearing risk, not the merge:
+      a `SourceSpan` is a byte offset with no file identity, so an offset from
+      the base file is still a *valid* index into the local one, and a finding
+      about the shared file would have rendered a confident underline over
+      unrelated text. [ADR-016](adr/016-diagnostic-provenance.md) settles that.
+      `Finding`, `Report`, `SpanIndex`, `ValidateCtx` and `Config` now carry
+      document identity, and the two-document rendering path is tested.
 
-      Needs its own ADR. [ADR-006](adr/006-safe-settings-compatibility.md)
-      deferred `extends:` rather than forbidding it — *"may be revisited later
-      on its own merits, not as compatibility"* — so this narrows that scope
-      clause rather than reversing the record.
+      Settled in ADR-016: inherit from another repository, ref-pinnable
+      (`acme/.github@v1`), no local-path form; **single level**, so a base file
+      may not itself extend another; **`prune` never inherits**, because
+      otherwise editing one shared file would start deleting across every
+      repository that extends it, decided by someone who does not own them.
+
+      Still open, and the first thing the `extends:` record must settle: how
+      collections merge — replace, concatenate, or by item identity with the
+      child overriding field by field. Provenance for an individual merged item
+      depends on that answer.
+
+      What remains to build: the `extends` key on `Settings` (a schema change,
+      additive per [ADR-007](adr/007-schema-is-the-contract.md)), fetching a
+      document from another repository through the contents API, and the merge
+      itself.
 
 ### Documentation
 

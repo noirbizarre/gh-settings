@@ -21,3 +21,4 @@ supersedes it, rather than a rewrite of history.
 | [013](013-single-crate.md) | Single crate until a second consumer exists | Accepted |
 | [014](014-releases.md) | Releases are orchestrated by gh-ship | Accepted |
 | [015](015-token-requirements.md) | Token requirements are declared per resource | Accepted |
+| [016](016-diagnostic-provenance.md) | Diagnostics carry the identity of the document they came from | Accepted |
