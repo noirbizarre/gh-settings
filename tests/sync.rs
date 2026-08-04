@@ -516,3 +516,201 @@ fn a_bypass_team_is_looked_up_once_however_often_it_is_named() {
         .count();
     assert_eq!(lookups, 1, "{:?}", output.requests);
 }
+
+// --- ruleset apply path -----------------------------------------------------
+//
+// Rulesets are the most intricate resource and the only one with a history of
+// bugs found against the real API rather than against a fixture: the permanent
+// diff, and the `422` for a partially-declared rule. Until these tests existed
+// the write path — and in particular the server id threaded through the change
+// payload — was verified by one person, once, by hand.
+
+/// The list endpoint, which omits `rules` and `bypass_actors`.
+const RULESET_SUMMARIES: &str = r#"[
+    {"id": 42, "name": "main", "target": "branch", "enforcement": "active"}
+]"#;
+
+/// The detail endpoint, which is the only one that returns a whole ruleset.
+///
+/// Carries the server-only fields deliberately, so `from_state` is exercised on
+/// a payload shaped like GitHub's rather than a tidied one.
+const RULESET_DETAIL: &str = r#"{
+    "id": 42,
+    "node_id": "RRS_abc",
+    "name": "main",
+    "target": "branch",
+    "enforcement": "active",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-02T00:00:00Z",
+    "source": "o/r",
+    "source_type": "Repository",
+    "current_user_can_bypass": "always",
+    "_links": {"self": {"href": "https://api.github.com/repos/o/r/rulesets/42"}},
+    "bypass_actors": [],
+    "rules": [{"type": "non_fast_forward"}]
+}"#;
+
+/// Register the two reads `current()` performs for one existing ruleset.
+fn with_existing_ruleset(sandbox: Sandbox) -> Sandbox {
+    sandbox
+        .get("repos/o/r/rulesets", RULESET_SUMMARIES)
+        .get("repos/o/r/rulesets/42", RULESET_DETAIL)
+}
+
+#[test]
+fn sync_creates_a_ruleset_with_its_rules() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nrulesets:\n  - name: main\n    enforcement: active\n    rules:\n      - type: non_fast_forward\n",
+        )
+        .get("repos/o/r/rulesets", "[]")
+        .respond("POST", "repos/o/r/rulesets", Fixture::created("{}"))
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+
+    let request = writes[0];
+    assert!(
+        request.starts_with("POST repos/o/r/rulesets "),
+        "creation must POST to the collection: {request}"
+    );
+
+    // A ruleset whose rules were dropped on the way out would still create
+    // successfully and still report success, so the body is the assertion.
+    let body: serde_json::Value = body_of(request);
+    assert_eq!(body["name"], "main");
+    assert_eq!(body["target"], "branch");
+    assert_eq!(body["enforcement"], "active");
+    assert_eq!(body["rules"][0]["type"], "non_fast_forward");
+}
+
+#[test]
+fn sync_updates_a_ruleset_through_the_server_id_not_its_name() {
+    // The identity in the configuration is the name, but the API is addressed by
+    // id. That translation happens in `diff`, which puts the id from `current`
+    // into the change payload, and nothing else checks it.
+    let runner = with_existing_ruleset(Sandbox::new().config(
+        "version: 1\nrulesets:\n  - name: main\n    enforcement: disabled\n    rules:\n      - type: non_fast_forward\n",
+    ))
+    .accept("PUT", "repos/o/r/rulesets/42")
+    .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(
+        writes[0].starts_with("PUT repos/o/r/rulesets/42 "),
+        "update must address the id: {}",
+        writes[0]
+    );
+
+    let body: serde_json::Value = body_of(writes[0]);
+    assert_eq!(body["enforcement"], "disabled");
+    // GitHub rejects a partial rule list, so an update sends the whole ruleset
+    // rather than the changed field.
+    assert_eq!(body["rules"][0]["type"], "non_fast_forward");
+}
+
+#[test]
+fn sync_deletes_an_unmanaged_ruleset_when_pruning() {
+    let runner = with_existing_ruleset(
+        Sandbox::new().config("version: 1\nrulesets:\n  prune: true\n  items: []\n"),
+    )
+    .respond("DELETE", "repos/o/r/rulesets/42", Fixture::no_content())
+    .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    assert_eq!(
+        output.writes(),
+        vec!["DELETE repos/o/r/rulesets/42 "],
+        "{:?}",
+        output.writes()
+    );
+}
+
+#[test]
+fn sync_leaves_an_unmanaged_ruleset_alone_without_prune() {
+    // Pruning is opt-in. A configuration that declares no rulesets at all still
+    // manages the section, and must not delete what it did not declare.
+    let runner = with_existing_ruleset(Sandbox::new().config("version: 1\nrulesets: []\n")).build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+    assert!(
+        output.writes().is_empty(),
+        "deleted a ruleset without --prune: {:?}",
+        output.writes()
+    );
+}
+
+#[test]
+fn an_unknown_rule_type_reaches_the_api_untouched() {
+    // The untyped passthrough is a promise (ADR-backed): a rule type this build
+    // predates must round-trip rather than be silently dropped on the next sync.
+    // Tested at the `diff` layer already; this is the half that would actually
+    // lose data, since it is the request body that reaches GitHub.
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nrulesets:\n  - name: main\n    rules:\n      - type: some_future_rule\n        parameters:\n          shiny: true\n",
+        )
+        .get("repos/o/r/rulesets", "[]")
+        .respond("POST", "repos/o/r/rulesets", Fixture::created("{}"))
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let body: serde_json::Value = body_of(output.writes()[0]);
+    assert_eq!(body["rules"][0]["type"], "some_future_rule");
+    assert_eq!(body["rules"][0]["parameters"]["shiny"], true);
+}
+
+#[test]
+fn a_ruleset_body_never_carries_the_fields_only_the_server_may_set() {
+    // `id`, `created_at` and friends come back from the detail endpoint. Sending
+    // them back is how a resource acquires a permanent diff, or a 422.
+    let runner = with_existing_ruleset(Sandbox::new().config(
+        "version: 1\nrulesets:\n  - name: main\n    enforcement: disabled\n    rules:\n      - type: non_fast_forward\n",
+    ))
+    .accept("PUT", "repos/o/r/rulesets/42")
+    .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let body: serde_json::Value = body_of(output.writes()[0]);
+    for field in [
+        "id",
+        "node_id",
+        "created_at",
+        "updated_at",
+        "_links",
+        "current_user_can_bypass",
+        "source",
+        "source_type",
+    ] {
+        assert!(
+            body.get(field).is_none(),
+            "server-only field `{field}` was sent back: {body}"
+        );
+    }
+}
+
+/// The JSON body of a logged request, which is everything after
+/// `METHOD endpoint `.
+#[track_caller]
+fn body_of(request: &str) -> serde_json::Value {
+    let body = request
+        .splitn(3, ' ')
+        .nth(2)
+        .unwrap_or_else(|| panic!("request has no body: {request}"));
+    serde_json::from_str(body).unwrap_or_else(|error| panic!("body is not JSON ({error}): {body}"))
+}
