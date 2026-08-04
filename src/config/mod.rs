@@ -9,12 +9,14 @@ pub mod diagnostics;
 pub mod discover;
 pub mod prunable;
 pub mod settings;
+pub mod source;
 pub mod spans;
 
 pub use diagnostics::{Finding, Report, Severity, suggest};
 pub use discover::{ConfigSource, discover};
 pub use prunable::Prunable;
 pub use settings::Settings;
+pub use source::{FileSpan, SourceFile, SourceId, Sources};
 pub use spans::{Location, SpanIndex, normalize_path};
 
 use miette::SourceSpan;
