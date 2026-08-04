@@ -7,6 +7,7 @@
 
 pub mod diagnostics;
 pub mod discover;
+pub mod merge;
 pub mod provenance;
 pub mod prunable;
 pub mod settings;
