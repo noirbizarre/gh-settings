@@ -16,7 +16,8 @@ use crate::resources::ResourceId;
 /// Arguments for `doctor`.
 #[derive(Debug, Default, clap::Args)]
 pub struct Args {
-    /// Exit non-zero when any resource is unmanageable.
+    /// Also fail when a capability cannot be determined, not just when it is
+    /// certainly impossible.
     #[arg(long)]
     pub strict: bool,
 }
@@ -38,7 +39,12 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         println!(
             "{}",
             ctx.json
-                .doctor(gh_version.as_deref(), auth_status.as_ref(), &capabilities)
+                .doctor(
+                    gh_version.as_deref(),
+                    auth_status.as_ref(),
+                    &capabilities,
+                    &inheritance
+                )
         );
     } else {
         println!(
@@ -52,12 +58,15 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         );
     }
 
+    let verdicts = || capabilities.iter().map(|(_, c)| c).chain([&inheritance]);
+
+    // Without `--strict` the exit code tracks the `ok` field exactly, so a
+    // pipeline gets the same answer whichever it reads. `--strict` widens the
+    // net to Unknown, which ADR-015 refuses to treat as a failure on its own.
     let blocked = gh_version.is_none()
         || auth_status.is_none()
-        || (args.strict
-            && capabilities
-                .iter()
-                .any(|(_, capability)| !matches!(capability, Capability::Manageable)));
+        || verdicts().any(Capability::is_certainly_impossible)
+        || (args.strict && verdicts().any(|c| !matches!(c, Capability::Manageable)));
 
     Ok(if blocked {
         exit::FAILURE

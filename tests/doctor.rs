@@ -356,3 +356,62 @@ fn the_actions_token_is_told_it_cannot_inherit() {
         output.stdout
     );
 }
+
+#[test]
+fn json_reports_the_inheritance_verdict_even_when_it_works() {
+    // The human rendering stays quiet when inheritance is fine, because a line
+    // about an unused feature is noise. A pipeline cannot ask a follow-up
+    // question, so the field is always there for it to key on.
+    let runner = sandbox("ghp_x", Some("repo, read:org")).build();
+    let output = runner.run(&["doctor", "-R", "o/r", "--format", "json"]);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["inheritance"]["status"], "manageable");
+    assert!(value["inheritance"].get("reason").is_none());
+}
+
+#[test]
+fn json_says_the_actions_token_cannot_inherit_and_is_not_ok() {
+    // The action always runs with `--format json`, so a verdict that reaches
+    // only the human renderer never reaches the audience that needs it.
+    let runner = sandbox("ghs_actionstoken", Some("issues")).build();
+    let output = runner.run_with_env(
+        &["doctor", "-R", "o/r", "--format", "json"],
+        &[("GITHUB_ACTIONS", "true")],
+    );
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+    assert_eq!(value["inheritance"]["status"], "impossible");
+    assert!(
+        value["inheritance"]["reason"]
+            .as_str()
+            .expect("a reason")
+            .contains("Contents: read"),
+        "{}",
+        output.stdout
+    );
+    assert_eq!(value["ok"], false);
+}
+
+#[test]
+fn the_exit_code_agrees_with_the_ok_field() {
+    // Two signals for one question. A pipeline gating on the exit code and one
+    // parsing `ok` must not reach opposite conclusions.
+    for (token, scopes, actions) in [
+        ("ghp_x", Some("repo, read:org"), false),
+        ("ghs_actionstoken", Some("issues"), true),
+        ("github_pat_x", None, false),
+    ] {
+        let runner = sandbox(token, scopes).build();
+        let env: &[(&str, &str)] = if actions {
+            &[("GITHUB_ACTIONS", "true")]
+        } else {
+            &[]
+        };
+        let output = runner.run_with_env(&["doctor", "-R", "o/r", "--format", "json"], env);
+
+        let value: serde_json::Value = serde_json::from_str(&output.stdout).expect("valid JSON");
+        let expected = if value["ok"] == true { 0 } else { 1 };
+        output.expect_status(expected);
+    }
+}

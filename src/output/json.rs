@@ -88,6 +88,12 @@ pub struct DoctorOutput<'a> {
     pub authentication: Option<AuthOutput<'a>>,
     /// Per-resource capability.
     pub resources: Vec<ResourceCapabilityOutput>,
+    /// Whether this credential can read a configuration named by `extends`.
+    ///
+    /// Reported unconditionally, unlike the human rendering which stays quiet
+    /// when inheritance works: a pipeline cannot ask a follow-up question, so
+    /// the field has to be there to be keyed on.
+    pub inheritance: CapabilityOutput,
 }
 
 /// JSON form of the credential in use.
@@ -127,6 +133,34 @@ pub struct ResourceCapabilityOutput {
     pub reason: Option<String>,
 }
 
+/// JSON form of a capability that belongs to no resource.
+#[derive(Debug, Serialize)]
+pub struct CapabilityOutput {
+    /// `manageable`, `impossible` or `unknown`.
+    pub status: &'static str,
+    /// Why, when it is impossible.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl From<&Capability> for CapabilityOutput {
+    fn from(capability: &Capability) -> Self {
+        Self {
+            status: capability_status(capability),
+            reason: capability.reason().map(str::to_string),
+        }
+    }
+}
+
+/// The wire name for a verdict.
+fn capability_status(capability: &Capability) -> &'static str {
+    match capability {
+        Capability::Manageable => "manageable",
+        Capability::Impossible(_) => "impossible",
+        Capability::Unknown => "unknown",
+    }
+}
+
 impl JsonRenderer {
     /// Render a `doctor` run.
     pub fn doctor(
@@ -134,20 +168,14 @@ impl JsonRenderer {
         gh_version: Option<&str>,
         auth: Option<&AuthStatus>,
         capabilities: &[(ResourceId, Capability)],
+        inheritance: &Capability,
     ) -> String {
         let resources: Vec<ResourceCapabilityOutput> = capabilities
             .iter()
             .map(|(id, capability)| ResourceCapabilityOutput {
                 resource: id.as_str().to_string(),
-                status: match capability {
-                    Capability::Manageable => "manageable",
-                    Capability::Impossible(_) => "impossible",
-                    Capability::Unknown => "unknown",
-                },
-                reason: match capability {
-                    Capability::Impossible(reason) => Some((*reason).to_string()),
-                    _ => None,
-                },
+                status: capability_status(capability),
+                reason: capability.reason().map(str::to_string),
             })
             .collect();
 
@@ -156,9 +184,10 @@ impl JsonRenderer {
             // scopes, and refusing to proceed on that basis would be guessing.
             ok: gh_version.is_some()
                 && auth.is_some()
+                && !inheritance.is_certainly_impossible()
                 && !capabilities
                     .iter()
-                    .any(|(_, capability)| matches!(capability, Capability::Impossible(_))),
+                    .any(|(_, capability)| capability.is_certainly_impossible()),
             gh_version,
             authentication: auth.map(|auth| AuthOutput {
                 hostname: &auth.hostname,
@@ -172,6 +201,7 @@ impl JsonRenderer {
                 admin_on_target: auth.admin_on_target,
             }),
             resources,
+            inheritance: inheritance.into(),
         };
 
         serde_json::to_string_pretty(&output)
