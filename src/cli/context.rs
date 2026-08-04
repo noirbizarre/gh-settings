@@ -69,8 +69,13 @@ impl Context {
         })
     }
 
-    /// Load and parse the configuration file.
-    pub fn load_config(&self) -> Result<Config, ContextError> {
+    /// Load and parse the configuration file, resolving anything it inherits.
+    ///
+    /// Async because a configuration may inherit from another repository, which
+    /// has to be fetched. Nothing is fetched unless the file declares `extends`,
+    /// so a configuration that does not inherit is still loaded without
+    /// touching the network.
+    pub async fn load_config(&self) -> Result<Config, ContextError> {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let source = discover(&cwd, self.args.config.as_deref())?;
         let path = source.path().to_path_buf();
@@ -80,7 +85,8 @@ impl Context {
             source: error,
         })?;
 
-        Ok(crate::config::parse(&path, &contents)?)
+        let loader = crate::github::GitHubBaseLoader::new(self.client());
+        Ok(crate::config::load(&path, &contents, &loader).await?)
     }
 
     /// The client as a trait object reference.

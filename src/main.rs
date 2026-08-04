@@ -33,7 +33,7 @@ async fn run(cli: Cli) -> miette::Result<i32> {
 
         Command::Validate(args) => {
             let ctx = Context::new(cli.global.clone(), true).await?;
-            let config = ctx.load_config()?;
+            let config = ctx.load_config().await?;
             gh_settings::cli::validate::run(
                 args,
                 &config,

@@ -233,7 +233,7 @@ fn permission_explanation(ctx: &Context, report: &ApplyReport) -> String {
 
 /// Compute a fresh plan from the configuration file.
 async fn compute_plan(args: &Args, ctx: &Context) -> Result<crate::engine::Plan> {
-    let config = ctx.load_config()?;
+    let config = ctx.load_config().await?;
 
     let findings = ctx.engine.validate(&config, &ctx.args.only);
     if findings.iter().any(crate::config::Finding::is_error) {

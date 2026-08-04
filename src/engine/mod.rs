@@ -52,7 +52,12 @@ impl Engine {
     /// fixing configuration one error per run is a miserable experience.
     pub fn validate(&self, config: &Config, only: &[ResourceId]) -> Vec<Finding> {
         let ctx = ValidateCtx::resolved(&config.spans, &config.provenance);
-        let mut findings = config.settings.validate(&ctx);
+
+        // Problems found while loading — a malformed `extends`, or a base that
+        // itself inherits — join the rest rather than being reported separately,
+        // so one run surfaces everything.
+        let mut findings = config.findings.clone();
+        findings.extend(config.settings.validate(&ctx));
 
         for resource in self.registry.selected(only) {
             findings.extend(resource.validate(&config.settings, &ctx));

@@ -41,8 +41,16 @@ pub struct Config {
     pub spans: Vec<SpanIndex>,
     /// Where each logical configuration path physically lives.
     pub provenance: Provenance,
-    /// The typed settings.
+    /// The typed settings, with any inherited configuration already merged in.
     pub settings: Settings,
+    /// Problems found while loading, before validation proper.
+    ///
+    /// A malformed `extends`, or a base that itself inherits. Carried rather
+    /// than returned so that every *other* problem in the file is reported in
+    /// the same pass — fixing a configuration one error per run is miserable.
+    pub findings: Vec<Finding>,
+    /// The bases that were read, and the commits they were read at.
+    pub bases: Vec<(Reference, Option<String>)>,
 }
 
 impl Config {
@@ -81,6 +89,26 @@ pub enum ConfigError {
         /// Underlying I/O failure.
         #[source]
         source: std::io::Error,
+    },
+
+    /// A base configuration could not be read.
+    #[error("could not read the base configuration `{reference}`")]
+    #[diagnostic(code(gh_settings::config::base_unavailable), help("{message}"))]
+    BaseUnavailable {
+        /// The reference as written.
+        reference: String,
+        /// What the loader said, which already names the permission or the ref.
+        message: String,
+    },
+
+    /// A base configuration was read but is not a valid configuration.
+    #[error("the base configuration `{reference}` is not valid")]
+    #[diagnostic(code(gh_settings::config::base_invalid), help("{message}"))]
+    BaseInvalid {
+        /// The reference as written.
+        reference: String,
+        /// The parse failure, condensed.
+        message: String,
     },
 
     /// The file is not valid YAML, or does not match the schema.
@@ -161,13 +189,85 @@ pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError
     let provenance = Provenance::for_document(root, &spans, &settings);
     settings.canonicalize();
 
+    let findings = extends::validate(&settings, &spans, false);
+
     Ok(Config {
         path: path.to_path_buf(),
         sources,
         spans: vec![spans],
         provenance,
         settings,
+        findings,
+        bases: Vec::new(),
     })
+}
+
+/// Parse a configuration and resolve anything it inherits.
+///
+/// The loader is consulted **only** when the document declares `extends`, so a
+/// configuration that does not inherit is still parsed without touching the
+/// network — which is what lets `validate` run in a pull request with no
+/// credentials.
+pub async fn load(
+    path: &std::path::Path,
+    source: &str,
+    loader: &dyn BaseLoader,
+) -> Result<Config, ConfigError> {
+    let mut config = parse(path, source)?;
+
+    let Some(declared) = config.settings.extends.clone() else {
+        return Ok(config);
+    };
+
+    // A malformed reference was already reported by `parse`; resolving it would
+    // only add a second complaint about the same line.
+    let Ok(reference) = declared.parse::<Reference>() else {
+        return Ok(config);
+    };
+
+    let loaded = loader
+        .load(&reference)
+        .await
+        .map_err(|message| ConfigError::BaseUnavailable {
+            reference: reference.to_string(),
+            message,
+        })?;
+
+    let base_id = config.sources.push(reference.to_string(), &loaded.text);
+    let base_spans = SpanIndex::build(base_id, &loaded.text);
+
+    let mut base_settings: Settings =
+        serde_norway::from_str(&loaded.text).map_err(|error| ConfigError::BaseInvalid {
+            reference: reference.to_string(),
+            message: condense(&error.to_string()),
+        })?;
+    base_settings.canonicalize();
+
+    // Reported, not refused: the rest of the base is still usable, and a single
+    // run should surface every problem it can.
+    config
+        .findings
+        .extend(extends::validate(&base_settings, &base_spans, true));
+
+    let base = merge::Layer {
+        id: base_id,
+        settings: &base_settings,
+        spans: &base_spans,
+    };
+    let child = merge::Layer {
+        id: SourceId::ROOT,
+        settings: &config.settings,
+        spans: &config.spans[0],
+    };
+
+    let (settings, provenance) = merge::merge(&base, &child);
+
+    config.settings = settings;
+    config.provenance = provenance;
+    config.spans.push(base_spans);
+    config.bases.push((reference, loaded.commit));
+
+    Ok(config)
 }
 
 /// Reduce serde's message to the part a human needs.

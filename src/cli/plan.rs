@@ -39,7 +39,7 @@ impl Args {
 
 /// Run the command.
 pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
-    let config = ctx.load_config()?;
+    let config = ctx.load_config().await?;
 
     // Refuse to plan against a configuration we know is wrong: the resulting
     // diff would be meaningless.
