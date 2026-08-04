@@ -47,7 +47,7 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     if findings.iter().any(crate::config::Finding::is_error) {
         let report = crate::config::Report::new(
             config.path.display().to_string(),
-            config.source.clone(),
+            config.source().to_string(),
             findings,
         );
         eprintln!("{:?}", miette::Report::new(report));

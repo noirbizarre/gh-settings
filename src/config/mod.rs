@@ -21,17 +21,35 @@ pub use spans::{Location, SpanIndex, normalize_path};
 
 use miette::SourceSpan;
 
-/// A configuration file, parsed and indexed.
+/// A configuration, parsed and indexed.
+///
+/// Plural in shape even though only one document contributes today: a
+/// configuration that inherits from another repository is several documents
+/// whose findings must each be rendered against their own text.
 #[derive(Debug)]
 pub struct Config {
-    /// Where the file came from, for diagnostics.
+    /// Where the root file came from, for diagnostics.
     pub path: std::path::PathBuf,
-    /// Raw file contents, retained so diagnostics can quote it.
-    pub source: String,
-    /// Byte-span index over the source.
-    pub spans: SpanIndex,
+    /// Every document that contributed, root first.
+    pub sources: Sources,
+    /// Span index per document, in the same order as [`Config::sources`].
+    pub spans: Vec<SpanIndex>,
     /// The typed settings.
     pub settings: Settings,
+}
+
+impl Config {
+    /// Text of the root document.
+    pub fn source(&self) -> &str {
+        &self.sources.root_file().text
+    }
+
+    /// Span index of the root document, which is always the first.
+    pub fn root_spans(&self) -> &SpanIndex {
+        self.spans
+            .first()
+            .expect("a parsed configuration always has a root document")
+    }
 }
 
 /// Errors raised while loading a configuration file.
@@ -83,8 +101,8 @@ pub enum ConfigError {
 /// Deserialization goes through `serde_path_to_error` so a failure yields the
 /// field path, which the span index turns into a precise underline (ADR-008).
 pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError> {
-    // One document today; `Config` learns to carry several in the next commit.
-    let spans = SpanIndex::build(SourceId::ROOT, source);
+    let (sources, root) = Sources::root(path.display().to_string(), source);
+    let spans = SpanIndex::build(root, source);
     let deserializer = serde_norway::Deserializer::from_str(source);
 
     let settings: Settings = match serde_path_to_error::deserialize(deserializer) {
@@ -135,8 +153,8 @@ pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError
 
     Ok(Config {
         path: path.to_path_buf(),
-        source: source.to_string(),
-        spans,
+        sources,
+        spans: vec![spans],
         settings,
     })
 }

@@ -239,7 +239,7 @@ async fn compute_plan(args: &Args, ctx: &Context) -> Result<crate::engine::Plan>
     if findings.iter().any(crate::config::Finding::is_error) {
         let report = crate::config::Report::new(
             config.path.display().to_string(),
-            config.source.clone(),
+            config.source().to_string(),
             findings,
         );
         return Err(miette::Report::new(report));

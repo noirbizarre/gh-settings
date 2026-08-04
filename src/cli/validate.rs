@@ -42,7 +42,7 @@ pub fn run(
     let has_errors = findings.iter().any(crate::config::Finding::is_error);
     let report = Report::new(
         config.path.display().to_string(),
-        config.source.clone(),
+        config.source().to_string(),
         findings,
     );
 

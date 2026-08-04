@@ -134,17 +134,54 @@ impl PruneOpts {
 
 /// Context handed to [`Resource::validate`].
 ///
-/// Carries the span index so a resource can attach a precise source location to
-/// its findings without knowing anything about YAML parsing.
+/// Carries the span indices so a resource can attach a precise source location
+/// to its findings without knowing anything about YAML parsing.
 pub struct ValidateCtx<'a> {
-    /// Span index of the configuration file.
-    pub spans: &'a SpanIndex,
+    /// Span index per contributing document, in override order: later entries
+    /// win, so the document that last declared a path is the one to underline.
+    ///
+    /// A slice rather than a single index because a configuration that inherits
+    /// from elsewhere is several documents, and a finding must point at whichever
+    /// one actually declared the offending value. Today it always has length one.
+    indices: &'a [SpanIndex],
 }
 
 impl<'a> ValidateCtx<'a> {
-    /// Build a context.
+    /// Build a context over a single document.
     pub fn new(spans: &'a SpanIndex) -> Self {
-        Self { spans }
+        Self {
+            indices: std::slice::from_ref(spans),
+        }
+    }
+
+    /// Build a context over a merge chain, innermost last.
+    pub fn layered(indices: &'a [SpanIndex]) -> Self {
+        Self { indices }
+    }
+
+    /// Resolve a path against the layers, last writer first.
+    ///
+    /// Mirrors the merge: whichever document last declared a path is the one
+    /// whose value ended up in [`Settings`], so it is the one to point at. The
+    /// merge and the lookup sharing a rule is what makes a divergence between
+    /// them a testable property rather than a mystery.
+    fn find(
+        &self,
+        lookup: impl Fn(&SpanIndex, &str) -> Option<crate::config::FileSpan>,
+        path: &str,
+    ) -> Option<crate::config::FileSpan> {
+        self.indices
+            .iter()
+            .rev()
+            .find_map(|index| lookup(index, path))
+    }
+
+    /// Whether any document was parsed at all.
+    ///
+    /// A miss against an index with no document means "there was nothing to look
+    /// in", which is not the same as the path being wrong.
+    fn any_document_parsed(&self) -> bool {
+        self.indices.iter().any(SpanIndex::has_root)
     }
 
     /// Span of a configuration path, for attaching to a [`Finding`].
@@ -153,9 +190,9 @@ impl<'a> ValidateCtx<'a> {
     /// not a user error, since a validation path is computed from a value that
     /// was just read out of the document.
     pub fn span(&self, path: &str) -> Option<crate::config::FileSpan> {
-        let found = self.spans.exact(path);
+        let found = self.find(SpanIndex::exact, path);
         debug_assert!(
-            found.is_some() || !self.spans.has_root(),
+            found.is_some() || !self.any_document_parsed(),
             "no node at `{path}`: the validation path does not match the document. \
              Underlining the enclosing section instead is how this stayed hidden."
         );
@@ -164,17 +201,17 @@ impl<'a> ValidateCtx<'a> {
 
     /// Span of a configuration *key*.
     pub fn key_span(&self, path: &str) -> Option<crate::config::FileSpan> {
-        let found = self.spans.exact_key(path);
+        let found = self.find(SpanIndex::exact_key, path);
         debug_assert!(
-            found.is_some() || !self.spans.has_root(),
+            found.is_some() || !self.any_document_parsed(),
             "no node at `{path}`: the validation path does not match the document"
         );
         found
     }
 
-    /// Whether the document declares this path.
+    /// Whether any document declares this path.
     pub fn contains(&self, path: &str) -> bool {
-        self.spans.contains(path)
+        self.indices.iter().any(|index| index.contains(path))
     }
 
     /// Base path of a collection section's items.
@@ -462,5 +499,66 @@ mod tests {
     fn the_command_line_overrides_the_configuration_in_both_directions() {
         assert!(PruneOpts { force: Some(true) }.resolve(false));
         assert!(!PruneOpts { force: Some(false) }.resolve(true));
+    }
+
+    mod validate_ctx {
+        use super::ValidateCtx;
+        use crate::config::{SourceId, Sources, SpanIndex};
+        use pretty_assertions::assert_eq;
+
+        /// Two documents declaring overlapping paths, as inheritance would
+        /// produce: `base` first, the local file last.
+        fn layered() -> (Sources, Vec<SpanIndex>) {
+            const BASE: &str =
+                "repository:\n  description: from the base\n  homepage: https://base\n";
+            const LOCAL: &str = "repository:\n  description: from the local file\n";
+
+            let (mut sources, root) = Sources::root("local.yml", LOCAL);
+            let base = sources.push("acme/.github@v1", BASE);
+
+            // Override order: innermost last, so the local file wins.
+            let indices = vec![SpanIndex::build(base, BASE), SpanIndex::build(root, LOCAL)];
+            (sources, indices)
+        }
+
+        #[test]
+        fn the_last_document_to_declare_a_path_owns_its_span() {
+            let (sources, indices) = layered();
+            let ctx = ValidateCtx::layered(&indices);
+
+            let span = ctx.span("repository.description").expect("declared twice");
+            assert_eq!(
+                span.source,
+                SourceId::ROOT,
+                "the local file overrode the base, so it is the file to underline"
+            );
+
+            let text = &sources.get(span.source).text[span.offset()..span.offset() + span.len()];
+            assert_eq!(text, "from the local file");
+        }
+
+        #[test]
+        fn a_path_only_the_base_declares_points_at_the_base() {
+            let (sources, indices) = layered();
+            let ctx = ValidateCtx::layered(&indices);
+
+            let span = ctx
+                .span("repository.homepage")
+                .expect("declared in the base");
+            assert_ne!(span.source, SourceId::ROOT);
+
+            // The offset is only meaningful against the base's own text. Read
+            // against the local file it would be a valid index into unrelated
+            // characters, which is the failure this design exists to prevent.
+            let text = &sources.get(span.source).text[span.offset()..span.offset() + span.len()];
+            assert_eq!(text, "https://base");
+        }
+
+        #[test]
+        fn a_single_document_context_still_resolves_against_itself() {
+            let spans = SpanIndex::build(SourceId::ROOT, "topics:\n  - rust\n");
+            let ctx = ValidateCtx::new(&spans);
+            assert_eq!(ctx.span("topics.0").unwrap().source, SourceId::ROOT);
+        }
     }
 }
