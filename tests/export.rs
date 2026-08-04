@@ -72,6 +72,64 @@ fn exported_configuration_is_valid() {
     runner.run(&["validate", "-R", "o/r"]).expect_status(0);
 }
 
+/// A repository whose ruleset is bypassed by organisation administrators.
+///
+/// GitHub reports that actor as `{actor_id: 1, actor_type: OrganizationAdmin}`,
+/// which the configuration schema spells `organization_admin: true`. Emitting
+/// both is an ambiguous bypass actor and `validate` rejects it.
+fn with_an_organization_admin_bypass() -> Sandbox {
+    populated()
+        .get(
+            "repos/o/r/rulesets",
+            r#"[{"id": 42, "name": "main", "target": "branch", "enforcement": "active"}]"#,
+        )
+        .get(
+            "repos/o/r/rulesets/42",
+            r#"{
+                "id": 42,
+                "name": "main",
+                "target": "branch",
+                "enforcement": "active",
+                "bypass_actors": [
+                    {"actor_id": 1, "actor_type": "OrganizationAdmin", "bypass_mode": "always"}
+                ],
+                "rules": [{"type": "non_fast_forward"}]
+            }"#,
+        )
+}
+
+#[test]
+fn an_organization_admin_bypass_exports_in_the_form_the_schema_accepts() {
+    let runner = with_an_organization_admin_bypass().build();
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+
+    assert!(
+        output.stdout.contains("organization_admin"),
+        "the readable form is missing:\n{}",
+        output.stdout
+    );
+    assert!(
+        !output.stdout.contains("actor_id"),
+        "the resolved form was emitted alongside it:\n{}",
+        output.stdout
+    );
+}
+
+#[test]
+fn an_exported_organization_admin_bypass_validates_and_round_trips() {
+    let runner = with_an_organization_admin_bypass().build();
+    runner
+        .run(&["export", "-R", "o/r", "--force"])
+        .expect_status(0);
+
+    runner.run(&["validate", "-R", "o/r"]).expect_status(0);
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(0);
+    assert!(output.stdout.contains("up to date"), "{}", output.stdout);
+}
+
 #[test]
 fn refuses_to_overwrite_without_force() {
     // Export cannot preserve comments, so silently replacing a hand-written file

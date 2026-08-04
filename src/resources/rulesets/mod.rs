@@ -289,10 +289,10 @@ impl Resource for Rulesets {
             return Ok(None);
         }
 
-        let mut rulesets: Vec<&Ruleset> = current
+        let mut rulesets: Vec<Ruleset> = current
             .rulesets
             .values()
-            .map(|(_, ruleset)| ruleset)
+            .map(|(_, ruleset)| ruleset.exportable())
             .collect();
         rulesets.sort_by(|a, b| a.name.cmp(&b.name));
 

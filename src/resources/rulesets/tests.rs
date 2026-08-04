@@ -357,10 +357,14 @@ fn conditions_are_order_insensitive() {
 }
 
 #[test]
-fn resolution_is_only_needed_for_named_actors() {
+fn resolution_is_needed_until_an_actor_has_an_identifier() {
     assert!(BypassActor::team("eng").needs_resolution());
     assert!(BypassActor::app("dependabot").needs_resolution());
-    assert!(!BypassActor::organization_admin().needs_resolution());
+
+    // No lookup, but still an identifier to fill in — and the diff compares on
+    // identifiers, so skipping it made this actor differ from itself forever.
+    assert!(BypassActor::organization_admin().needs_resolution());
+
     assert!(
         !BypassActor {
             actor_id: Some(5),

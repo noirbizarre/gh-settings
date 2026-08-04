@@ -174,9 +174,15 @@ impl BypassActor {
         }
     }
 
-    /// Whether this actor still needs a slug lookup.
+    /// Whether this actor still needs its identifier filled in.
+    ///
+    /// `organization_admin` counts: it needs no *lookup*, but it does need the
+    /// fixed identifier, and the diff compares on identifiers. Leaving it out
+    /// here made a configuration that only bypasses organisation admins report
+    /// a ruleset update on every single run.
     pub fn needs_resolution(&self) -> bool {
-        self.actor_id.is_none() && (self.team.is_some() || self.app.is_some())
+        self.actor_id.is_none()
+            && (self.team.is_some() || self.app.is_some() || self.organization_admin)
     }
 
     /// Resolve the slug to an identifier, caching lookups for the run.
@@ -187,11 +193,13 @@ impl BypassActor {
         resolver: &Resolver,
     ) -> GitHubResult<()> {
         if !self.needs_resolution() {
-            // `organization_admin` has a fixed identifier and needs no lookup.
-            if self.organization_admin && self.actor_id.is_none() {
-                self.actor_id = Some(1);
-                self.actor_type = Some("OrganizationAdmin".into());
-            }
+            return Ok(());
+        }
+
+        // A fixed identifier, so no round trip.
+        if self.organization_admin {
+            self.actor_id = Some(1);
+            self.actor_type = Some("OrganizationAdmin".into());
             return Ok(());
         }
 
@@ -274,6 +282,25 @@ impl BypassActor {
             self.actor_id.unwrap_or(0),
             self.bypass_mode.as_str(),
         )
+    }
+
+    /// A copy fit for writing back into a configuration file.
+    ///
+    /// `organization_admin` and the resolved `actor_id`/`actor_type` pair name
+    /// the same actor two different ways. [`Self::from_api`] keeps both, because
+    /// the identifier is what the diff compares on — but a file carrying both is
+    /// exactly what `validate` rejects as an ambiguous bypass actor. An export
+    /// therefore keeps only the readable form, which [`Self::resolve`] expands
+    /// again on the way back out.
+    pub fn exportable(&self) -> Self {
+        if self.organization_admin {
+            Self {
+                bypass_mode: self.bypass_mode,
+                ..Self::organization_admin()
+            }
+        } else {
+            self.clone()
+        }
     }
 }
 
@@ -569,6 +596,22 @@ impl Ruleset {
     /// Build the API request body.
     pub fn as_body(&self) -> Value {
         super::ruleset_body(self)
+    }
+
+    /// A copy fit for writing back into a configuration file.
+    ///
+    /// See [`BypassActor::exportable`]: what the API returns and what the schema
+    /// accepts are not quite the same shape, and an export that cannot be
+    /// validated is worse than no export at all.
+    pub fn exportable(&self) -> Self {
+        Self {
+            bypass_actors: self
+                .bypass_actors
+                .iter()
+                .map(BypassActor::exportable)
+                .collect(),
+            ..self.clone()
+        }
     }
 
     /// Compare against the current state.
