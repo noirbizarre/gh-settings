@@ -1,0 +1,17 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:3:3]
+ 1 | version: 1
+ 2 | repository:
+ 3 |   topics:
+   :   ^^^|^^
+   :      `-- invalid topic
+ 4 |     - Not A Valid Topic!
+   `----
+  help: topics may contain lowercase letters, digits and hyphens, must start
+        with a letter or digit, and are at most 50 characters

@@ -109,7 +109,7 @@ pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError
     let spans = SpanIndex::build(root, source);
     let deserializer = serde_norway::Deserializer::from_str(source);
 
-    let settings: Settings = match serde_path_to_error::deserialize(deserializer) {
+    let mut settings: Settings = match serde_path_to_error::deserialize(deserializer) {
         Ok(settings) => settings,
         Err(error) => {
             let field_path = normalize_path(&error.path().to_string());
@@ -156,6 +156,7 @@ pub fn parse(path: &std::path::Path, source: &str) -> Result<Config, ConfigError
     };
 
     let provenance = Provenance::for_document(root, &spans, &settings);
+    settings.canonicalize();
 
     Ok(Config {
         path: path.to_path_buf(),

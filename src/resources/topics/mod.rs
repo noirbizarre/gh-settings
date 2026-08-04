@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::config::{Finding, Prunable, Settings};
+use crate::config::{Finding, Settings};
 use crate::github::{GitHubClient, GitHubClientExt, Request, Result as GitHubResult, Target};
 use crate::resources::{Change, Op, PruneOpts, Requirement, Resource, ResourceId, ValidateCtx};
 
@@ -103,13 +103,9 @@ impl Resource for Topics {
     }
 
     fn desired(&self, settings: &Settings) -> Option<Self::Desired> {
-        // Accept the safe-settings spelling too. A conflict between the two is
-        // caught by `Settings::validate`, so preferring one here is safe.
-        let section: Prunable<String> = match (&settings.topics, &settings.repository) {
-            (Some(section), _) => section.clone(),
-            (None, Some(repository)) => Prunable::List(repository.topics.clone()?),
-            (None, None) => return None,
-        };
+        // Both spellings were folded into `topics` when the document was
+        // parsed, so there is only one to read here.
+        let section = settings.topics.as_ref()?;
 
         Some(Desired {
             topics: section

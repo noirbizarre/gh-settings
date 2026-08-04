@@ -44,11 +44,19 @@ pub struct Provenance {
 
 impl Provenance {
     /// Build the provenance of a single document.
+    ///
+    /// Also records the `safe-settings` spelling of topics: `repository.topics`
+    /// is canonicalised into `topics` before validation, so the logical path no
+    /// longer exists in the document and needs redirecting to the physical one.
     pub fn for_document(id: SourceId, spans: &SpanIndex, settings: &Settings) -> Self {
         let mut provenance = Self {
             entries: HashMap::new(),
             default_source: Some(id),
         };
+
+        if !spans.contains("topics") && spans.contains("repository.topics") {
+            provenance.record("topics", id, "repository.topics");
+        }
 
         for section in SECTIONS {
             let nested = format!("{section}.items");

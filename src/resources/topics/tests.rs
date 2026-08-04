@@ -186,7 +186,11 @@ mod desired_projection {
     #[test]
     fn falls_back_to_the_safe_settings_spelling() {
         // One-way compatibility: we read their layout, we do not adopt it.
-        let settings: Settings = serde_norway::from_str("repository:\n  topics: [rust]").unwrap();
+        // The folding happens when the document is parsed, so `desired` sees a
+        // single spelling and this test has to do what `parse` does.
+        let mut settings: Settings =
+            serde_norway::from_str("repository:\n  topics: [rust]").unwrap();
+        settings.canonicalize();
         assert_eq!(
             Topics.desired(&settings).unwrap().topics,
             ["rust".to_string()].into_iter().collect()
@@ -197,8 +201,9 @@ mod desired_projection {
     fn the_top_level_section_wins_when_both_are_present() {
         // The combination is rejected by `Settings::validate`; this only pins the
         // behaviour so it is deterministic rather than arbitrary.
-        let settings: Settings =
+        let mut settings: Settings =
             serde_norway::from_str("topics: [top]\nrepository:\n  topics: [nested]").unwrap();
+        settings.canonicalize();
         assert_eq!(
             Topics.desired(&settings).unwrap().topics,
             ["top".to_string()].into_iter().collect()

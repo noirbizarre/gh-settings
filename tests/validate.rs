@@ -299,3 +299,20 @@ fn a_bad_ruleset_is_underlined_in_the_object_form() {
     );
     assert_snapshot!(output.stderr);
 }
+
+#[test]
+fn a_bad_topic_in_the_safe_settings_spelling_is_underlined_where_it_was_written() {
+    // `repository.topics` is folded into `topics` before validation, so the
+    // finding names a path that exists in no document. That used to panic a
+    // debug build outright and silently lose the underline in a release one —
+    // on a configuration that is perfectly legal.
+    let output = validate("version: 1\nrepository:\n  topics:\n    - Not A Valid Topic!\n");
+    output.expect_status(1);
+
+    assert!(
+        output.stderr.contains("Not A Valid Topic!"),
+        "the underline must reach the topic the user wrote: {}",
+        output.stderr
+    );
+    assert_snapshot!(output.stderr);
+}

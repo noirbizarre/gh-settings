@@ -61,6 +61,28 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Fold the `safe-settings` spellings into the canonical ones.
+    ///
+    /// `repository.topics` becomes the top-level `topics` when the latter is
+    /// absent, so nothing downstream has to know there were ever two spellings.
+    /// Declaring both is a conflict rather than a precedence question and is
+    /// reported by [`Settings::validate`], which sees the value before this runs
+    /// on it — the check compares what the user wrote.
+    ///
+    /// [`Provenance`](super::Provenance) redirects the `topics` path back to
+    /// `repository.topics`, so a finding still underlines what is in the file.
+    pub fn canonicalize(&mut self) {
+        if self.topics.is_some() {
+            return;
+        }
+        let Some(repository) = self.repository.as_mut() else {
+            return;
+        };
+        if let Some(topics) = repository.topics.take() {
+            self.topics = Some(Prunable::List(topics));
+        }
+    }
+
     /// Whether the file declares nothing at all.
     pub fn is_empty(&self) -> bool {
         self.repository.is_none()
