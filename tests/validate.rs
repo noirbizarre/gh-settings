@@ -213,6 +213,28 @@ fn a_branch_only_rule_on_a_tag_ruleset_is_rejected() {
     assert_snapshot!(output.stderr);
 }
 
+#[test]
+fn a_rule_finding_underlines_the_rule_the_user_wrote() {
+    // Rules used to be sorted during normalisation while the finding's path was
+    // still a position in the authored document, so the underline landed on
+    // whichever rule happened to occupy that index afterwards. The node existed,
+    // so the debug assertion passed and the diagnostic was confidently wrong.
+    //
+    // `pull_request` sorts after `creation`, so the two orders disagree — which
+    // is exactly what the single-rule test above cannot catch.
+    let output = validate(
+        "version: 1\nrulesets:\n  - name: tags\n    target: tag\n    rules:\n      - type: pull_request\n      - type: creation\n",
+    );
+    output.expect_status(1);
+
+    assert!(
+        output.stderr.contains("- type: pull_request\n"),
+        "the offending rule must be quoted: {}",
+        output.stderr
+    );
+    assert_snapshot!(output.stderr);
+}
+
 // --- the two `Prunable` forms -----------------------------------------------
 //
 // Every collection section accepts both `labels: [...]` and

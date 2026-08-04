@@ -282,15 +282,32 @@ fn bypass_actor_order_does_not_matter() {
         ],
         ..Ruleset::new("r")
     };
-    let actors = |ruleset: &Ruleset| -> Vec<_> {
-        ruleset
-            .normalized()
-            .bypass_actors
-            .iter()
-            .map(BypassActor::comparable)
-            .collect()
-    };
-    assert_eq!(actors(&a), actors(&b));
+    // Asserted through the diff rather than through `normalized`, because that
+    // is where order is now made not to matter. `normalized` deliberately
+    // preserves declaration order so that validation's positional paths line up
+    // with the document the user wrote.
+    let changes = plan(vec![a], vec![(1, b)], false);
+    assert!(changes.is_empty(), "{changes:#?}");
+}
+
+#[test]
+fn normalisation_preserves_the_order_the_user_wrote() {
+    // Sorting here used to misalign every positional span path: validation
+    // indexes into this list and looks the position up in the authored
+    // document, so a reordered list underlined the wrong rule.
+    let ruleset = Ruleset::new("r").with_rules(vec![
+        Rule::new("update"),
+        Rule::new("creation"),
+        Rule::new("non_fast_forward"),
+    ]);
+
+    let normalized = ruleset.normalized();
+    let types: Vec<&str> = normalized
+        .rules
+        .iter()
+        .map(|rule| rule.rule_type.as_str())
+        .collect();
+    assert_eq!(types, ["update", "creation", "non_fast_forward"]);
 }
 
 #[test]

@@ -535,19 +535,22 @@ impl Ruleset {
 
     /// A normalised copy, safe to compare against a normalised counterpart.
     ///
-    /// Rules and bypass actors are canonically ordered because the API returns
-    /// them in an arbitrary order; without this the plan would report changes on
-    /// every run.
+    /// **Declaration order is preserved.** The API returns rules and bypass
+    /// actors in an arbitrary order, so comparison has to be order-insensitive —
+    /// but that belongs at the comparison, not baked into the value everything
+    /// else reads. Sorting here reordered the list that validation then indexed
+    /// into positionally, so a finding about one rule underlined another: the
+    /// node existed, the assertion passed, and the underline was confidently
+    /// wrong. See `diff_against`, which matches rules by type and sorts actors
+    /// only to compare them.
     pub fn normalized(&self) -> Self {
-        let mut rules: Vec<Rule> = self.rules.iter().map(Rule::normalized).collect();
-        rules.sort_by(|a, b| a.rule_type.cmp(&b.rule_type));
+        let rules: Vec<Rule> = self.rules.iter().map(Rule::normalized).collect();
 
-        let mut bypass_actors: Vec<BypassActor> = self
+        let bypass_actors: Vec<BypassActor> = self
             .bypass_actors
             .iter()
             .map(BypassActor::normalized)
             .collect();
-        bypass_actors.sort_by_key(BypassActor::sort_key);
 
         Self {
             name: self.name.trim().to_string(),
@@ -596,16 +599,22 @@ impl Ruleset {
             ));
         }
 
-        let desired_actors: Vec<_> = self
+        // Sorted here rather than in `normalized`, because the API returns
+        // actors in an arbitrary order and this is the only place that order
+        // must not matter. Sorting the stored value instead would misalign the
+        // positional paths validation builds.
+        let mut desired_actors: Vec<_> = self
             .bypass_actors
             .iter()
             .map(BypassActor::comparable)
             .collect();
-        let current_actors: Vec<_> = current
+        desired_actors.sort();
+        let mut current_actors: Vec<_> = current
             .bypass_actors
             .iter()
             .map(BypassActor::comparable)
             .collect();
+        current_actors.sort();
         if desired_actors != current_actors {
             fields.push(FieldDiff::changed(
                 "bypass_actors",
