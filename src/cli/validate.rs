@@ -40,11 +40,7 @@ pub fn run(
     }
 
     let has_errors = findings.iter().any(crate::config::Finding::is_error);
-    let report = Report::new(
-        config.path.display().to_string(),
-        config.source().to_string(),
-        findings,
-    );
+    let report = Report::new(config.sources.clone(), findings);
 
     // Render through miette so the excerpt, underlines and helps are all laid
     // out consistently with every other diagnostic this tool emits.

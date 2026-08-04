@@ -45,11 +45,7 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     // diff would be meaningless.
     let findings = ctx.engine.validate(&config, &ctx.args.only);
     if findings.iter().any(crate::config::Finding::is_error) {
-        let report = crate::config::Report::new(
-            config.path.display().to_string(),
-            config.source().to_string(),
-            findings,
-        );
+        let report = crate::config::Report::new(config.sources.clone(), findings);
         eprintln!("{:?}", miette::Report::new(report));
         return Ok(exit::FAILURE);
     }
