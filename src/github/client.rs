@@ -24,6 +24,12 @@ pub struct Request {
     pub paginate: bool,
     /// Extra request headers, e.g. a preview `Accept` value.
     pub headers: Vec<(String, String)>,
+    /// Whether the response body is text rather than JSON.
+    ///
+    /// A handful of endpoints — reading a file's contents, notably — can return
+    /// the bytes themselves. Decoding those as JSON fails, so the transport has
+    /// to be told not to.
+    pub raw: bool,
 }
 
 impl Request {
@@ -35,6 +41,7 @@ impl Request {
             body: None,
             paginate: false,
             headers: Vec::new(),
+            raw: false,
         }
     }
 
@@ -83,6 +90,17 @@ impl Request {
         self
     }
 
+    /// Ask for the body verbatim rather than as JSON.
+    ///
+    /// Sets the media type GitHub uses to return a file's own bytes, and tells
+    /// the transport not to try to decode them.
+    pub fn raw(mut self) -> Self {
+        self.raw = true;
+        self.headers
+            .push(("Accept".into(), "application/vnd.github.raw".into()));
+        self
+    }
+
     /// Add a request header.
     pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.push((name.into(), value.into()));
@@ -95,8 +113,10 @@ impl Request {
 pub struct Response {
     /// HTTP status code.
     pub status: u16,
-    /// Decoded JSON body. `Null` for empty (`204`) responses.
+    /// Decoded JSON body. `Null` for empty (`204`) and raw responses.
     pub body: Value,
+    /// The body verbatim, for requests that asked for it raw.
+    pub text: Option<String>,
     /// Response headers we care about, lowercased.
     ///
     /// Notably `x-oauth-scopes`, which is the only reliable way to enumerate the
@@ -105,6 +125,21 @@ pub struct Response {
 }
 
 impl Response {
+    /// A JSON response, which is all but a handful of endpoints.
+    pub fn json(status: u16, body: Value, headers: Vec<(String, String)>) -> Self {
+        Self {
+            status,
+            body,
+            text: None,
+            headers,
+        }
+    }
+
+    /// The body verbatim, for a request that asked for it raw.
+    pub fn text(&self) -> Option<&str> {
+        self.text.as_deref()
+    }
+
     /// Look up a response header, case-insensitively.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
@@ -192,6 +227,20 @@ mod tests {
     }
 
     #[test]
+    fn a_raw_request_asks_for_the_bytes_themselves() {
+        let request = Request::get("repos/o/r/contents/x.yml").raw();
+        assert!(request.raw);
+        assert!(
+            request
+                .headers
+                .iter()
+                .any(|(name, value)| name == "Accept" && value == "application/vnd.github.raw"),
+            "{:?}",
+            request.headers
+        );
+    }
+
+    #[test]
     fn lists_are_paginated_by_default() {
         assert!(Request::list("repos/o/r/labels").paginate);
         assert!(!Request::get("repos/o/r").paginate);
@@ -199,11 +248,11 @@ mod tests {
 
     #[test]
     fn header_lookup_ignores_case() {
-        let response = Response {
-            status: 200,
-            body: Value::Null,
-            headers: vec![("X-OAuth-Scopes".into(), "repo, read:org".into())],
-        };
+        let response = Response::json(
+            200,
+            Value::Null,
+            vec![("X-OAuth-Scopes".into(), "repo, read:org".into())],
+        );
         assert_eq!(response.header("x-oauth-scopes"), Some("repo, read:org"));
         assert_eq!(response.header("missing"), None);
     }

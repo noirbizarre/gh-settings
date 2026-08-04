@@ -216,6 +216,18 @@ impl GitHubClient for GhCliTransport {
             });
         }
 
+        // Asked for verbatim, so there is nothing to decode. A YAML document
+        // cannot begin with `HTTP/`, so `parse_included_response` above has
+        // already stripped the head correctly and left the body untouched.
+        if request.raw {
+            return Ok(Response {
+                status,
+                body: Value::Null,
+                text: Some(payload.to_string()),
+                headers,
+            });
+        }
+
         // A `204 No Content` (routine for DELETE) has an empty body.
         let body = if payload.trim().is_empty() {
             Value::Null
@@ -229,6 +241,7 @@ impl GitHubClient for GhCliTransport {
         Ok(Response {
             status,
             body,
+            text: None,
             headers,
         })
     }

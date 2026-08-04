@@ -10,12 +10,14 @@
 //! the whole layer testable by putting a stub `gh` on `PATH`.
 
 pub mod auth;
+pub mod base;
 pub mod client;
 pub mod gh_cli;
 pub mod resolver;
 pub mod target;
 
 pub use auth::{AuthStatus, TokenKind};
+pub use base::GitHubBaseLoader;
 pub use client::{GitHubClient, GitHubClientExt, Request, Response};
 pub use gh_cli::GhCliTransport;
 pub use resolver::Resolver;

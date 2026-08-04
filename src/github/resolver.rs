@@ -141,11 +141,7 @@ mod tests {
                 });
             }
 
-            Ok(Response {
-                status: 200,
-                body: json!({ "id": 42 }),
-                headers: Vec::new(),
-            })
+            Ok(Response::json(200, json!({ "id": 42 }), Vec::new()))
         }
     }
 
