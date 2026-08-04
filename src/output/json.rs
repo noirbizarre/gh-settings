@@ -221,6 +221,30 @@ impl JsonRenderer {
             .unwrap_or_else(|error| panic!("a report should always serialise: {error}"))
     }
 
+    /// Render a pre-flight refusal.
+    ///
+    /// Deliberately the same shape as [`Self::apply`]: to a consumer, "these
+    /// changes did not happen because the token cannot make them" is the same
+    /// answer whether we established it before trying or after. `status` is
+    /// absent because no request was made — which is the whole point.
+    pub fn refused(&self, blocked: &[(ResourceId, &'static str)]) -> String {
+        let output = ApplyOutput {
+            success: false,
+            applied: Counts::default(),
+            skipped: 0,
+            failures: blocked
+                .iter()
+                .map(|(id, reason)| FailureOutput {
+                    resource: id.as_str().to_string(),
+                    key: String::new(),
+                    error: (*reason).to_string(),
+                    status: None,
+                })
+                .collect(),
+        };
+        serde_json::to_string_pretty(&output)
+            .unwrap_or_else(|error| panic!("a refusal should always serialise: {error}"))
+    }
 }
 
 /// Stable machine-readable key for a credential kind.

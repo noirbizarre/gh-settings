@@ -966,3 +966,195 @@ fn a_permission_failure_inside_actions_says_the_token_cannot_be_granted_it() {
         output.stderr
     );
 }
+
+// --- pre-flight -------------------------------------------------------------
+
+#[test]
+fn sync_refuses_to_start_when_the_token_certainly_cannot_write() {
+    // A classic token advertises its scopes, so "this will fail" is a fact
+    // rather than a guess. Discovering it after the first failed write is
+    // strictly worse, and with --continue-on-error, worse several times over.
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&default_repository())
+        .token("ghp_x")
+        .scopes("gist")
+        .respond(
+            "GET",
+            "",
+            Fixture::ok("{}").header("x-oauth-scopes", "gist"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(1);
+
+    assert!(
+        output.writes().is_empty(),
+        "the whole point is that nothing is attempted: {:?}",
+        output.writes()
+    );
+    assert!(
+        output.stderr.contains("Refusing to start"),
+        "{}",
+        output.stderr
+    );
+    assert_cli_snapshot!(output.stderr);
+}
+
+#[test]
+fn the_preflight_lets_an_unintrospectable_token_proceed() {
+    // The constraint that matters. This token reports no scopes and the admin
+    // probe cannot settle it either, so we do not know — and not knowing must
+    // never block a write. The user gets GitHub's own answer instead of ours.
+    //
+    // If this test ever starts failing because the pre-flight became more
+    // confident, the pre-flight is wrong, not the test: there is no flag to
+    // overrule a refusal.
+    let no_permissions = {
+        let mut value: serde_json::Value =
+            serde_json::from_str(&default_repository()).expect("valid default");
+        // `permissions` absent means the probe cannot tell, which is the state
+        // this test is about.
+        value.as_object_mut().unwrap().remove("permissions");
+        value.to_string()
+    };
+
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&no_permissions)
+        .token("github_pat_x")
+        .accept("PATCH", "repos/o/r")
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+
+    assert!(
+        !output.stderr.contains("Refusing to start"),
+        "an unknown verdict must not block: {}",
+        output.stderr
+    );
+    assert!(
+        output
+            .writes()
+            .iter()
+            .any(|write| write.starts_with("PATCH")),
+        "the write should have been attempted: {:?}",
+        output.writes()
+    );
+}
+
+#[test]
+fn the_preflight_only_judges_the_resources_that_have_changes() {
+    // Labels need `Issues: write`, which the Actions token holds. A plan that
+    // touches only labels must not be refused because some *other* resource
+    // would have been impossible.
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: feature\n    color: a2eeef\n")
+        .get("repos/o/r/labels", "[]")
+        .token("ghs_actionstoken")
+        .scopes("issues")
+        .respond("POST", "repos/o/r/labels", Fixture::created("{}"))
+        .build();
+
+    let output = runner.run_with_env(
+        &["sync", "-R", "o/r", "--yes"],
+        &[("GITHUB_ACTIONS", "true")],
+    );
+    output.expect_status(0);
+    assert!(
+        !output.stderr.contains("Refusing to start"),
+        "{}",
+        output.stderr
+    );
+}
+
+#[test]
+fn the_preflight_refuses_the_actions_token_for_repository_settings() {
+    // The documented headline case, now caught before the write instead of
+    // after it.
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&default_repository())
+        .token("ghs_actionstoken")
+        .scopes("issues")
+        .build();
+
+    let output = runner.run_with_env(
+        &["sync", "-R", "o/r", "--yes"],
+        &[("GITHUB_ACTIONS", "true")],
+    );
+    output.expect_status(1);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+    assert!(
+        output.stderr.contains("cannot be granted to GITHUB_TOKEN"),
+        "{}",
+        output.stderr
+    );
+}
+
+#[test]
+fn dry_run_is_never_blocked_by_the_preflight() {
+    // `--dry-run` writes nothing, so there is nothing to refuse. Blocking it
+    // would remove the one way to inspect a plan with a read-only token.
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&default_repository())
+        .token("ghp_x")
+        .scopes("gist")
+        .respond(
+            "GET",
+            "",
+            Fixture::ok("{}").header("x-oauth-scopes", "gist"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--dry-run"]);
+    output.expect_status(0);
+    assert!(
+        !output.stderr.contains("Refusing to start"),
+        "{}",
+        output.stderr
+    );
+}
+
+#[test]
+fn a_preflight_refusal_is_machine_readable() {
+    // A refusal is still an answer, and `--format json` promises stdout is
+    // parseable. Printing prose to stderr and nothing to stdout would break a
+    // consumer in exactly the situation it most needs to understand.
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  description: hello\n")
+        .repository(&default_repository())
+        .token("ghp_x")
+        .scopes("gist")
+        .respond(
+            "GET",
+            "",
+            Fixture::ok("{}").header("x-oauth-scopes", "gist"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--format", "json"]);
+    output.expect_status(1);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout)
+        .unwrap_or_else(|error| panic!("stdout was not JSON: {error}\n{}", output.stdout));
+
+    assert_eq!(value["success"], false);
+    let failures = value["failures"].as_array().expect("failures");
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0]["resource"], "repository");
+    assert!(
+        failures[0]["error"]
+            .as_str()
+            .unwrap()
+            .contains("missing the `repo` scope")
+    );
+    assert!(
+        failures[0]["status"].is_null(),
+        "no request was made, so there is no HTTP status to report: {}",
+        failures[0]
+    );
+}

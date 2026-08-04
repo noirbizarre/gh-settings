@@ -76,6 +76,20 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         println!();
     }
 
+    // Before asking for confirmation, not after: there is no point confirming
+    // changes we are about to refuse.
+    if !args.dry_run {
+        let blocked = preflight(ctx, &plan).await;
+        if !blocked.is_empty() {
+            if ctx.args.is_json() {
+                println!("{}", ctx.json.refused(&blocked));
+            } else {
+                eprint!("{}", render_refusal(&blocked));
+            }
+            return Ok(exit::FAILURE);
+        }
+    }
+
     if !args.dry_run && !confirm(args, &plan)? {
         eprintln!("Aborted.");
         return Ok(exit::SUCCESS);
@@ -108,6 +122,66 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     } else {
         exit::FAILURE
     })
+}
+
+/// Decide whether any pending change is *certain* to be rejected.
+///
+/// Returns the blocked resources and the reason for each; empty means proceed.
+///
+/// Without this, a permission problem is discovered only after a failed write —
+/// and with `--continue-on-error`, after several. The information needed to say
+/// so up front was already available; it was simply never consulted.
+///
+/// # Conservatism
+///
+/// This only ever refuses on [`Capability::Impossible`], which
+/// [`Requirement::verdict`](crate::resources::Requirement::verdict) returns only
+/// from evidence: an advertised classic scope that is absent, or the Actions
+/// `GITHUB_TOKEN` against a permission no workflow can be granted.
+///
+/// A token we could not introspect yields [`Capability::Unknown`] and is allowed
+/// through, so GitHub's own answer is what the user sees. A pre-flight that
+/// blocked a token it merely failed to understand would be unappealable — there
+/// is no flag to overrule it — and would be worse than the problem it solves.
+async fn preflight(
+    ctx: &Context,
+    plan: &crate::engine::Plan,
+) -> Vec<(crate::resources::ResourceId, &'static str)> {
+    let pending: Vec<crate::resources::ResourceId> = plan
+        .resources
+        .iter()
+        .filter(|resource| !resource.changes.is_empty())
+        .map(|resource| resource.id)
+        .collect();
+
+    if pending.is_empty() {
+        return Vec::new();
+    }
+
+    // Costs a few requests, so it happens only when there is something to write.
+    let auth = super::doctor::introspect(ctx).await;
+
+    pending
+        .iter()
+        .filter_map(|id| {
+            let resource = ctx.engine.registry().get(*id)?;
+            let reason = resource.requirement().verdict(auth.as_ref()).reason()?;
+            Some((*id, reason))
+        })
+        .collect()
+}
+
+/// Render a pre-flight refusal for a human.
+fn render_refusal(blocked: &[(crate::resources::ResourceId, &'static str)]) -> String {
+    use std::fmt::Write as _;
+
+    let mut out = String::new();
+    out.push_str("Refusing to start: this token cannot make some of these changes.\n\n");
+    for (id, reason) in blocked {
+        let _ = writeln!(out, "  ✘ {:<12} {reason}", id.title());
+    }
+    out.push_str("\nNothing was changed. Run `gh settings doctor` for the full picture.\n");
+    out
 }
 
 /// Explain a permission failure in terms of the permission that was missing.

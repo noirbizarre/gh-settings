@@ -1,0 +1,9 @@
+---
+source: tests/sync.rs
+expression: output.stderr
+---
+Refusing to start: this token cannot make some of these changes.
+
+  ✘ Repository   missing the `repo` scope
+
+Nothing was changed. Run `gh settings doctor` for the full picture.
