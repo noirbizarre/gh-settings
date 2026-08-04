@@ -44,17 +44,15 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     // Refuse to plan against a configuration we know is wrong: the resulting
     // diff would be meaningless.
     let findings = ctx.engine.validate(&config, &ctx.args.only);
-    if findings.iter().any(crate::config::Finding::is_error) {
-        let report = crate::config::Report::new(config.sources.clone(), findings);
-        eprintln!("{:?}", miette::Report::new(report));
-        return Ok(exit::FAILURE);
+    if let Some(code) = crate::cli::findings::reject(ctx, &config, &findings) {
+        return Ok(code);
     }
 
     let plan = ctx
         .engine
         .plan(
             ctx.client(),
-            &ctx.target,
+            ctx.target()?,
             &config,
             &args.prune_opts(),
             &ctx.args.only,

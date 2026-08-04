@@ -316,3 +316,33 @@ fn a_bad_topic_in_the_safe_settings_spelling_is_underlined_where_it_was_written(
     );
     assert_snapshot!(output.stderr);
 }
+
+#[test]
+fn validate_needs_no_repository() {
+    // The docs recommend `validate` as a pre-commit hook and as a fork pull
+    // request check. Both run somewhere that has no GitHub remote to infer a
+    // repository from, and `extends` names its base absolutely, so there is
+    // nothing for a repository to contribute to the answer.
+    let runner = Sandbox::new()
+        .config("version: 1\ntopics:\n  - rust\n")
+        .build();
+
+    let output = runner.run(&["validate"]);
+    output.expect_status(0);
+    assert!(output.stdout.contains("is valid"), "{}", output.stdout);
+}
+
+#[test]
+fn validate_needs_no_credentials() {
+    let runner = Sandbox::new()
+        .config("version: 1\ntopics:\n  - rust\n")
+        .build();
+
+    let output = runner.run(&["validate"]);
+    output.expect_status(0);
+    assert!(
+        output.requests.is_empty(),
+        "validate contacted GitHub: {:?}",
+        output.requests
+    );
+}

@@ -7,6 +7,7 @@
 pub mod context;
 pub mod doctor;
 pub mod export;
+pub mod findings;
 pub mod internal;
 pub mod plan;
 pub mod schema;

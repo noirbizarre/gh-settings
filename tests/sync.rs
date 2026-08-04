@@ -1158,3 +1158,45 @@ fn a_preflight_refusal_is_machine_readable() {
         failures[0]
     );
 }
+
+#[test]
+fn plan_rejects_an_invalid_configuration_in_the_requested_format() {
+    // `plan` used to print a human diagnostic to stderr and nothing at all to
+    // stdout, so a pipeline parsing stdout saw an empty document and could not
+    // tell a broken configuration from a broken pipe.
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: nothex\n")
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r", "--format", "json"]);
+    output.expect_status(1);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout)
+        .unwrap_or_else(|error| panic!("stdout was not JSON: {error}\n{}", output.stdout));
+
+    assert_eq!(value["valid"], false);
+    assert_eq!(
+        value["findings"][0]["code"],
+        "gh_settings::labels::invalid_color"
+    );
+}
+
+#[test]
+fn sync_rejects_an_invalid_configuration_in_the_requested_format() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: nothex\n")
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--format", "json"]);
+    output.expect_status(1);
+
+    let value: serde_json::Value = serde_json::from_str(&output.stdout)
+        .unwrap_or_else(|error| panic!("stdout was not JSON: {error}\n{}", output.stdout));
+
+    assert_eq!(value["valid"], false);
+    assert!(
+        output.writes().is_empty(),
+        "wrote despite an invalid configuration: {:?}",
+        output.writes()
+    );
+}

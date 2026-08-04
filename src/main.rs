@@ -23,8 +23,8 @@ async fn main() -> ExitCode {
 
 async fn run(cli: Cli) -> miette::Result<i32> {
     match &cli.command {
-        // `validate` and `schema` deliberately need no network and no
-        // repository, so they work in a pull request CI job with no credentials.
+        // `validate` and `schema` deliberately need no network, no repository
+        // and no credentials, so they work in a pull request CI job from a fork.
         Command::Schema(args) => gh_settings::cli::schema::run(args),
 
         // Documentation generators. Like `schema`, they need no network and no
@@ -32,16 +32,11 @@ async fn run(cli: Cli) -> miette::Result<i32> {
         Command::Internal(args) => gh_settings::cli::internal::run(args),
 
         Command::Validate(args) => {
-            let ctx = Context::new(cli.global.clone(), true).await?;
-            let config = ctx.load_config().await?;
-            gh_settings::cli::validate::run(
-                args,
-                &config,
-                &ctx.engine,
-                &ctx.args.only,
-                ctx.args.is_json(),
-                &ctx.json,
-            )
+            // No target: whether a file is well-formed is not a question about
+            // a repository, and asking for one broke `validate` outside a
+            // checkout — the very place the docs recommend running it.
+            let ctx = Context::without_target(cli.global.clone());
+            gh_settings::cli::validate::run(args, &ctx).await
         }
 
         Command::Plan(args) => {

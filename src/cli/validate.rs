@@ -1,12 +1,13 @@
 //! `gh settings validate`.
 //!
 //! Deliberately offline: validation must be usable as a fast pre-commit hook and
-//! in pull request CI where no repository credentials are available.
+//! in pull request CI where no repository credentials are available. It acts on
+//! no repository at all, so it works outside a checkout too.
 
 use miette::Result;
 
-use crate::cli::exit;
-use crate::config::Report;
+use crate::cli::context::Context;
+use crate::cli::{exit, findings};
 
 /// Arguments for `validate`.
 #[derive(Debug, Default, clap::Args)]
@@ -17,38 +18,20 @@ pub struct Args {
 }
 
 /// Run the command.
-pub fn run(
-    args: &Args,
-    config: &crate::config::Config,
-    engine: &crate::engine::Engine,
-    only: &[crate::resources::ResourceId],
-    json: bool,
-    renderer: &crate::output::JsonRenderer,
-) -> Result<i32> {
-    let findings = engine.validate(config, only);
+pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
+    let config = ctx.load_config().await?;
+    let findings = ctx.engine.validate(&config, &ctx.args.only);
 
-    if json {
-        println!("{}", renderer.validation(&config.sources, &findings));
-        let failed = findings.iter().any(crate::config::Finding::is_error)
-            || (args.strict && !findings.is_empty());
-        return Ok(if failed { exit::FAILURE } else { exit::SUCCESS });
-    }
+    let failed = findings.iter().any(crate::config::Finding::is_error)
+        || (args.strict && !findings.is_empty());
 
-    if findings.is_empty() {
+    // A clean file still gets a JSON document, so a pipeline always has
+    // something to parse; the human form says so in one line instead.
+    if findings.is_empty() && !ctx.args.is_json() {
         println!("✔ {} is valid.", config.path.display());
-        return Ok(exit::SUCCESS);
+    } else {
+        findings::emit(ctx, &config, &findings);
     }
 
-    let has_errors = findings.iter().any(crate::config::Finding::is_error);
-    let report = Report::new(config.sources.clone(), findings);
-
-    // Render through miette so the excerpt, underlines and helps are all laid
-    // out consistently with every other diagnostic this tool emits.
-    eprintln!("{:?}", miette::Report::new(report));
-
-    Ok(if has_errors || args.strict {
-        exit::FAILURE
-    } else {
-        exit::SUCCESS
-    })
+    Ok(if failed { exit::FAILURE } else { exit::SUCCESS })
 }

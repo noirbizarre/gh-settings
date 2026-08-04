@@ -19,8 +19,13 @@ use crate::output::{HumanRenderer, JsonRenderer, Theme};
 pub struct Context {
     /// Parsed global options.
     pub args: GlobalArgs,
-    /// The repository being acted upon.
-    pub target: Target,
+    /// The repository being acted upon, when the command needs one.
+    ///
+    /// `None` for `validate`, which reads a file and says whether it is
+    /// well-formed. Nothing about that question involves a repository, and
+    /// demanding one is what stopped it running on a fork's pull request or in
+    /// a bare container. Use [`Context::target`] to reach it.
+    target: Option<Target>,
     /// The GitHub client.
     pub client: Arc<dyn GitHubClient>,
     /// The resource engine.
@@ -55,18 +60,40 @@ impl Context {
     /// is deliberately separate from [`Self::load_config`].
     pub async fn new(args: GlobalArgs, read_only: bool) -> Result<Self, ContextError> {
         let target = resolve_target(&args).await?;
-        let theme = Theme::from_flag(args.color_override());
+        Ok(Self::build(args, read_only, Some(target)))
+    }
 
+    /// Build a context for a command that acts on no repository.
+    ///
+    /// Only `validate` qualifies. `extends` names its base absolutely, as
+    /// `owner/repo@ref`, so even an inheriting configuration never needs to know
+    /// which repository it would be applied to.
+    pub fn without_target(args: GlobalArgs) -> Self {
+        Self::build(args, true, None)
+    }
+
+    /// Assemble the parts every context shares.
+    fn build(args: GlobalArgs, read_only: bool, target: Option<Target>) -> Self {
+        let theme = Theme::from_flag(args.color_override());
         let client = Arc::new(GhCliTransport::new().read_only(read_only));
 
-        Ok(Self {
+        Self {
             human: HumanRenderer::new(theme, args.verbose),
             json: JsonRenderer,
             engine: Engine::new(),
             client,
             target,
             args,
-        })
+        }
+    }
+
+    /// The repository being acted upon.
+    ///
+    /// Errors rather than panics: the only context without one is `validate`'s,
+    /// and a future command reaching for a target it never asked for should say
+    /// what a user can do about it.
+    pub fn target(&self) -> Result<&Target, ContextError> {
+        self.target.as_ref().ok_or(ContextError::NoTarget)
     }
 
     /// Load and parse the configuration file, resolving anything it inherits.

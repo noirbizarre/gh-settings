@@ -59,6 +59,11 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         None => compute_plan(args, ctx).await?,
     };
 
+    // The configuration was rejected; the findings are already reported.
+    let Some(plan) = plan else {
+        return Ok(exit::FAILURE);
+    };
+
     if plan.is_empty() {
         // Nothing to do is the *common* case for anything automated, so this
         // path must still honour `--format json`. Emitting human text here left
@@ -99,7 +104,7 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
         .engine
         .apply(
             ctx.client(),
-            &ctx.target,
+            ctx.target()?,
             &plan,
             &ApplyOptions {
                 continue_on_error: args.continue_on_error,
@@ -232,36 +237,42 @@ fn permission_explanation(ctx: &Context, report: &ApplyReport) -> String {
 }
 
 /// Compute a fresh plan from the configuration file.
-async fn compute_plan(args: &Args, ctx: &Context) -> Result<crate::engine::Plan> {
+///
+/// `None` means the configuration was rejected and the findings already
+/// reported, in whichever format the user asked for.
+async fn compute_plan(args: &Args, ctx: &Context) -> Result<Option<crate::engine::Plan>> {
     let config = ctx.load_config().await?;
 
     let findings = ctx.engine.validate(&config, &ctx.args.only);
-    if findings.iter().any(crate::config::Finding::is_error) {
-        let report = crate::config::Report::new(config.sources.clone(), findings);
-        return Err(miette::Report::new(report));
+    if crate::cli::findings::reject(ctx, &config, &findings).is_some() {
+        return Ok(None);
     }
 
-    Ok(ctx
-        .engine
-        .plan(
-            ctx.client(),
-            &ctx.target,
-            &config,
-            &args.prune_opts(),
-            &ctx.args.only,
-        )
-        .await?)
+    Ok(Some(
+        ctx.engine
+            .plan(
+                ctx.client(),
+                ctx.target()?,
+                &config,
+                &args.prune_opts(),
+                &ctx.args.only,
+            )
+            .await?,
+    ))
 }
 
 /// Load a saved plan and verify it still describes reality.
 ///
 /// A reviewed plan that silently applies something else would defeat the purpose
 /// of having a plan artifact at all, so drift is a hard error (ADR-010).
+///
+/// `None` carries the same meaning as in [`compute_plan`]: the configuration was
+/// rejected and said so.
 async fn load_saved_plan(
     args: &Args,
     ctx: &Context,
     path: &std::path::Path,
-) -> Result<crate::engine::Plan> {
+) -> Result<Option<crate::engine::Plan>> {
     let contents = std::fs::read_to_string(path)
         .map_err(|error| miette::miette!("could not read {}: {error}", path.display()))?;
 
@@ -270,17 +281,19 @@ async fn load_saved_plan(
 
     let saved = artifact.to_plan()?;
 
-    if saved.target != ctx.target {
+    if &saved.target != ctx.target()? {
         return Err(ArtifactError::WrongRepository {
             expected: saved.target.slug(),
-            actual: ctx.target.slug(),
+            actual: ctx.target()?.slug(),
         }
         .into());
     }
 
     // Recompute and compare: the repository may have changed since the plan was
     // reviewed, in which case applying it blind would be wrong.
-    let fresh = compute_plan(args, ctx).await?;
+    let Some(fresh) = compute_plan(args, ctx).await? else {
+        return Ok(None);
+    };
 
     // An inherited configuration that moved is reported as such. It is by far
     // the likeliest cause once a base is shared, and it is not the repository
@@ -297,7 +310,7 @@ async fn load_saved_plan(
         return Err(ArtifactError::Drift.into());
     }
 
-    Ok(saved)
+    Ok(Some(saved))
 }
 
 /// Ask for confirmation when it is warranted.

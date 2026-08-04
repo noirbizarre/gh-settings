@@ -38,13 +38,12 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
     if ctx.args.is_json() {
         println!(
             "{}",
-            ctx.json
-                .doctor(
-                    gh_version.as_deref(),
-                    auth_status.as_ref(),
-                    &capabilities,
-                    &inheritance
-                )
+            ctx.json.doctor(
+                gh_version.as_deref(),
+                auth_status.as_ref(),
+                &capabilities,
+                &inheritance
+            )
         );
     } else {
         println!(
@@ -113,7 +112,7 @@ pub(crate) async fn introspect(ctx: &Context) -> Option<AuthStatus> {
     // Only probe when scopes are unavailable; a classic token already told us
     // everything and the extra request would be waste.
     if status.scopes == Scopes::Unknown {
-        status.admin_on_target = auth::probe_admin(ctx.client(), &ctx.target).await;
+        status.admin_on_target = auth::probe_admin(ctx.client(), ctx.target().ok()?).await;
     }
 
     Some(status)
