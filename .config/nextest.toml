@@ -9,12 +9,14 @@ path = "junit.xml"
 # The live suite talks to a real repository, so it is `#[ignore]`d and never
 # runs by accident. This profile runs those tests and nothing else.
 #
-# `fail-fast` stays on here, unlike CI: a live failure usually leaves the
-# repository part-way through a change, and piling more mutations on top of an
-# unknown state makes the diagnosis harder, not easier.
+# `fail-fast` was on here while a failing test skipped its own cleanup and left
+# the repository part-way through a change. Cleanup now runs from `Drop`, so
+# each test hands the next one a clean sandbox whether it passed or not — and
+# stopping at the first failure only hides the rest of the picture for a suite
+# that runs once a night.
 [profile.live]
 default-filter = 'test(/^live_/)'
-fail-fast = true
+fail-fast = false
 # One at a time: every test targets the same repository, so parallel runs would
 # race each other rather than the code.
 test-threads = 1
