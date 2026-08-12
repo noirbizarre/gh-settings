@@ -26,6 +26,10 @@ target
 !mise.toml
 !mise.lock
 
+# Personal overrides — this is where GH_SETTINGS_TEST_REPO belongs, and it
+# names a repository nobody else should be running the live suite against.
+mise.local.toml
+
 # The gh-ship release artifact is produced by the prepare workflow and uploaded
 # as an artifact; it is never a source file.
 /ship.release.json

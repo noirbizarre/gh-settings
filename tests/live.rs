@@ -1,9 +1,11 @@
 //! The live suite: real `gh`, real repository, real GitHub.
 //!
 //! Every test is `#[ignore]`d and named `live_*`. They run only when
-//! `GH_SETTINGS_TEST_REPO` names a repository free of managed configuration.
+//! `GH_SETTINGS_TEST_REPO` names a repository free of managed configuration —
+//! a public sandbox you own, never the one CI uses (ADR-019):
 //!
 //! ```sh
+//! mise run test:live:setup you/sandbox
 //! GH_SETTINGS_TEST_REPO=you/sandbox mise run test:live
 //! ```
 //!

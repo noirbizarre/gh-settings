@@ -64,6 +64,14 @@ description = "Run the live suite against GH_SETTINGS_TEST_REPO"
 run = "cargo nextest run --profile live --run-ignored all"
 raw_args = true
 
+[tasks."test:live:setup"]
+description = "Create or repair a live-test sandbox repository"
+# CI's sandbox belongs to CI: two actors sharing one repository do not
+# interleave, they make each other's pre-flight refuse. Bring your own, and use
+# this to build it — and to dig it out again when a crashed run leaves it dirty.
+run = "./scripts/live-sandbox.sh"
+raw_args = true
+
 [tasks.cover]
 description = "Run tests with coverage"
 run = "cargo llvm-cov nextest"

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted, extended by [019](019-live-test-sandboxes.md).
 
 ## Context
 

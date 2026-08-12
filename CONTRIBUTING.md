@@ -25,6 +25,7 @@ each commit.
 | `mise run` | Format, lint, lint the workflows, build, test |
 | `mise run test` | `cargo nextest run` (accepts nextest selectors) |
 | `mise run test:live` | The live suite, against `GH_SETTINGS_TEST_REPO` |
+| `mise run test:live:setup` | Create or repair a sandbox for the live suite |
 | `mise run cover` | Coverage via `cargo llvm-cov` |
 | `mise run snapshots` | Review pending `insta` snapshots |
 | `mise run lint` | Clippy with `-D warnings` |
@@ -84,6 +85,45 @@ Three layers, described in [ADR-012](docs/adr/012-testing-strategy.md):
 
 The stub answers unregistered reads with an empty result but *fails*
 unregistered writes, so an unexpected mutation cannot slip through unnoticed.
+
+### The live suite
+
+A fourth, optional layer runs the real binary against a real repository
+([ADR-019](docs/adr/019-live-test-sandboxes.md)). It is `#[ignore]`d and skips
+unless `GH_SETTINGS_TEST_REPO` names one, so an ordinary `mise run` never
+touches the network.
+
+**Bring your own sandbox.** The repository CI uses belongs to CI. The tests
+mutate whatever they are pointed at, and the pre-flight refuses a repository
+that already holds managed configuration — so two people sharing one do not
+interleave, they make each other's run abort.
+
+```sh
+mise run test:live:setup you/gh-settings-sandbox
+export GH_SETTINGS_TEST_REPO=you/gh-settings-sandbox
+mise run test:live
+```
+
+The sandbox must be **public**: on the free plan a private repository answers
+`403 Upgrade to GitHub Pro` for the rulesets endpoints, which is most of what
+the suite is for. To keep the variable across shells, put it in
+`mise.local.toml` (git-ignored):
+
+```toml
+[env]
+GH_SETTINGS_TEST_REPO = "you/gh-settings-sandbox"
+```
+
+Each test cleans up after itself, but a cancelled or crashed run may not get
+that far, and the next run will then refuse to start:
+
+```
+refusing to run the live suite: you/sandbox already has rulesets
+```
+
+That is the safety check working, not a bug. `mise run test:live:setup --yes`
+resets the sandbox — it goes wider than the tests' own cleanup, which does not
+cover Pages or the repository fields.
 
 ## Commits
 

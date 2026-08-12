@@ -24,7 +24,12 @@
 //!   is checked, not assumed;
 //! * each test cleans up after itself.
 //!
+//! The sandbox is yours, not CI's: a repository shared by two actors does not
+//! interleave, it makes the second pre-flight refuse (ADR-019). Build one, and
+//! dig it out again after a crashed run, with:
+//!
 //! ```sh
+//! mise run test:live:setup you/sandbox
 //! GH_SETTINGS_TEST_REPO=you/sandbox mise run test:live
 //! ```
 //!
@@ -257,6 +262,10 @@ impl Live {
     /// unmanaged" is the tool's central safety rule, so an empty file prunes
     /// *nothing* — it has to name each section explicitly with `prune: true`
     /// and no items.
+    ///
+    /// Only the prunable collections are here. Pages and the repository fields
+    /// have no `prune`, and the pre-flight does not look at them either, so
+    /// their residue is cleared by `scripts/live-sandbox.sh` instead.
     pub fn cleanup(&self) {
         let purge = "version: 1\n\
              labels:\n  prune: true\n  items: []\n\
