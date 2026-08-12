@@ -47,6 +47,15 @@ MANUAL_ONLY = {
 
 BINARY = "gh-settings"
 
+# gh matches on the suffix, so the only thing that matters is that the staged
+# filename ends in `<asset><ext>`. How the tag reaches the script — interpolated
+# or passed through `env:` — is deliberately left free, so hardening that step
+# cannot break this check.
+STAGED = re.compile(
+    r'"dist/' + re.escape(BINARY) + r'_[^"\n]*'
+    r"\$\{\{\s*matrix\.asset\s*\}\}\$\{\{\s*matrix\.ext\s*\}\}\""
+)
+
 
 def main() -> int:
     path = Path(
@@ -83,7 +92,7 @@ def main() -> int:
 
     # The staged filename must end in the platform string, or the suffix match
     # `gh` performs will not find it.
-    if f'"dist/{BINARY}_${{{{ inputs.tag }}}}_${{{{ matrix.asset }}}}${{{{ matrix.ext }}}}"' not in workflow:
+    if not STAGED.search(workflow):
         problems.append(
             "the staged asset filename no longer ends in "
             "`<asset><ext>`; gh matches on that suffix"
