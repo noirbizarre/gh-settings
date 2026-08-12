@@ -187,6 +187,21 @@ rulesets:
         parameters:
           required_approving_review_count: 1
       - type: non_fast_forward
+
+environments:
+  - name: production
+    wait_timer: 15
+    reviewers:
+      - team: engineering
+    deployment_branch_policy:
+      branches: ["main"]
+    variables:
+      - name: DEPLOY_URL
+        value: https://example.com
+
+variables:
+  - name: DEFAULT_REGION
+    value: eu-west-1
 ```
 
 Every section is **optional**, and an absent section is **unmanaged** — nothing
@@ -257,9 +272,10 @@ Reading a base needs `Contents: read` on **that** repository, which the Actions
 **Important:** `secrets.GITHUB_TOKEN` **cannot** manage repository settings.
 
 A workflow's `permissions:` block has no `administration` key, so repository
-metadata, topics, autolinks and rulesets cannot be granted to it — this is not a
-permission you forgot to enable, it cannot be requested at all. Labels are the
-exception, since they live under `Issues: write`.
+metadata, topics, autolinks, rulesets and environments cannot be granted to it —
+this is not a permission you forgot to enable, it cannot be requested at all.
+Variables are blocked the same way, by the missing `variables` key. Labels are
+the exception, since they live under `Issues: write`.
 
 Use a personal access token or a GitHub App installation token:
 
@@ -300,6 +316,8 @@ Resources
   ✔ labels
   ✔ autolinks
   ✔ rulesets
+  ✔ environments
+  ✔ variables
 ```
 
 Full details, including the exact scopes each resource needs, are in
@@ -322,11 +340,12 @@ rather than a guess.
 | Labels (including renames) | ✅ |
 | Autolinks | ✅ |
 | Rulesets | ✅ |
+| Environments (protection rules, reviewers, branch policies) | ✅ |
+| Actions variables, at repository and environment scope | ✅ |
 | Inheritance from a shared repository (`extends:`) | ✅ |
 
-Custom properties, environments, variables, webhooks, Pages and collaborators
-are planned; secrets are [deliberately out of
-scope](docs/adr/009-secrets-out-of-scope.md).
+Custom properties, webhooks, Pages and collaborators are planned; secrets are
+[deliberately out of scope](docs/adr/009-secrets-out-of-scope.md).
 
 The guiding ambition: *if it is under the repository Settings page, it should
 eventually be manageable here.*

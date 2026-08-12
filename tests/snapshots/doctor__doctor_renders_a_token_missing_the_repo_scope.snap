@@ -9,13 +9,15 @@ Environment
     Scopes           gist
 
 Resources
-  ✘ repository  missing the `repo` scope
-  ✘ topics      missing the `repo` scope
-  ✘ labels      missing the `repo` scope
-  ✘ autolinks   missing the `repo` scope
-  ✘ rulesets    missing the `repo` scope
+  ✘ repository    missing the `repo` scope
+  ✘ topics        missing the `repo` scope
+  ✘ labels        missing the `repo` scope
+  ✘ autolinks     missing the `repo` scope
+  ✘ rulesets      missing the `repo` scope
+  ✘ environments  missing the `repo` scope
+  ✘ variables     missing the `repo` scope
 
-  ✘ extends     missing the `repo` scope
+  ✘ extends       missing the `repo` scope
 
 → Use a personal access token or a GitHub App installation token.
   See https://noirbizarre.github.io/gh-settings/authentication/

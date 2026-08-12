@@ -39,6 +39,86 @@ A single autolink reference.
 | `url_template` | string | yes | Target URL, containing the `<num>` placeholder. |
 
 
+## `environments`
+
+Deployment environments and their protection rules.
+
+Environment-scoped Actions variables are declared inside each
+environment, under `variables`.
+
+Note that inheritance replaces an environment whole: a file that extends
+another and redeclares `production` merely to change its `wait_timer`
+also replaces the inherited `variables` and `reviewers` lists.
+
+May also be written as a bare list, which is the same as giving `items` with `prune: false`.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `items` | list of object | no | The declared items. |
+| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
+
+
+### `environments.items[]`
+
+A deployment environment.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `deployment_branch_policy` | `protected` \| object | no | Which refs may deploy to this environment. |
+| `name` | string | yes | The environment name, for example `production`. |
+| `prevent_self_review` | boolean | no | Whether the user who triggered a deployment may approve it themselves. |
+| `reviewers` | list of object | no | Who must approve a deployment to this environment. |
+| `variables` | list of object | no | Actions variables scoped to this environment. |
+| `wait_timer` | integer | no | Minutes to wait before a deployment to this environment may proceed. |
+
+
+#### `environments.items[].deployment_branch_policy`
+
+Which refs may deploy to this environment.
+
+Three states, and the difference between the last two matters: omitting
+the field leaves the policy alone, whereas an explicit `null` sets it to
+*any branch*, which is GitHub's own default and a real setting.
+
+```yaml
+deployment_branch_policy: protected      # protected branches only
+deployment_branch_policy:                # explicit patterns
+  branches: [main, "release/*"]
+  tags: ["v*"]
+deployment_branch_policy: null           # any branch
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `branches` | list of string | no | Branch name patterns, for example `main` or `release/*`. |
+| `tags` | list of string | no | Tag name patterns, for example `v*`. |
+
+
+#### `environments.items[].reviewers[]`
+
+Who must approve a deployment.
+
+Declared by login or slug rather than by numeric identifier: identifiers are
+neither stable across organisations nor meaningful to a human, which would
+make an exported configuration useless anywhere but its origin. Resolution
+to identifiers happens in `prepare`, before anything is written.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `team` | string | no | An organisation team slug. |
+| `user` | string | no | A user login. |
+
+
+#### `environments.items[].variables[]`
+
+A single Actions variable.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | The variable name, for example `DEPLOY_URL`. |
+| `value` | string | yes | The value. |
+
+
 ## `extends`
 
 Inherit this configuration from another repository.
@@ -157,6 +237,58 @@ A repository ruleset.
 | `target` | `branch` \| `tag` \| `push` | no | What the ruleset applies to. Defaults to `branch`. |
 
 
+#### `rulesets.items[].bypass_actors[]`
+
+Who may bypass a ruleset.
+
+Declared by slug rather than id: numeric ids are neither stable across
+organisations nor meaningful to a human reading the file, which would make an
+exported configuration unusable anywhere but its origin. Resolution happens in
+[`Resource::prepare`](crate::resources::Resource::prepare).
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `actor_id` | integer | no | Raw actor identifier. |
+| `actor_type` | string | no | Raw actor type, used together with `actor_id`. |
+| `app` | string | no | Bypass through a GitHub App, by slug. |
+| `bypass_mode` | `always` \| `pull_request` | no | When the bypass applies. Defaults to `always`. |
+| `organization_admin` | boolean | no | Bypass for organisation administrators. |
+| `team` | string | no | Bypass through an organisation team, by slug. |
+
+
+#### `rulesets.items[].conditions`
+
+Which refs it applies to.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `ref_name` | object | no | Ref name matching. |
+
+
+##### `rulesets.items[].conditions.ref_name`
+
+Ref name matching.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `exclude` | list of string | no | Patterns to exclude. Defaults to `[]`. |
+| `include` | list of string | no | Patterns to include. Defaults to `[]`. |
+
+
+#### `rulesets.items[].rules[]`
+
+A single rule within a ruleset.
+
+Modelled as `{ type, parameters }` rather than a closed enum of every known
+rule so that a rule type this build predates round-trips untouched instead of
+being silently dropped.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `parameters` | any | no | Rule-specific parameters. |
+| `type` | string | yes | The rule type, for example `pull_request` or `required_status_checks`. |
+
+
 ## `topics`
 
 Repository topics.
@@ -170,6 +302,31 @@ May also be written as a bare list, which is the same as giving `items` with `pr
 |---|---|---|---|
 | `items` | list of string | no | The declared items. |
 | `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
+
+
+## `variables`
+
+Repository-scoped Actions variables.
+
+Environment-scoped variables live under `environments[].variables`
+instead.
+
+May also be written as a bare list, which is the same as giving `items` with `prune: false`.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `items` | list of object | no | The declared items. |
+| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
+
+
+### `variables.items[]`
+
+A single Actions variable.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | The variable name, for example `DEPLOY_URL`. |
+| `value` | string | yes | The value. |
 
 
 ## `version`

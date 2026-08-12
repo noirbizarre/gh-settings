@@ -346,3 +346,78 @@ fn validate_needs_no_credentials() {
         output.requests
     );
 }
+
+#[test]
+fn a_reserved_variable_name_is_rejected() {
+    // GitHub answers a 409 without explaining, so the check has to happen here.
+    let output = validate("version: 1\nvariables:\n  - name: GITHUB_TOKEN\n    value: x\n");
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn an_invalid_variable_name_points_at_the_name() {
+    let output = validate("version: 1\nvariables:\n  - name: 9lives\n    value: x\n");
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn duplicate_variables_are_reported_with_both_locations() {
+    let output = validate(
+        "version: 1\nvariables:\n  - name: region\n    value: eu\n  - name: REGION\n    value: us\n",
+    );
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn a_variable_inside_an_environment_is_underlined_where_it_was_written() {
+    let output = validate(
+        "version: 1\nenvironments:\n  - name: staging\n    variables:\n      - name: GITHUB_X\n        value: x\n",
+    );
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn duplicate_environments_are_reported_with_both_locations() {
+    let output = validate("version: 1\nenvironments:\n  - name: staging\n  - name: Staging\n");
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn an_excessive_wait_timer_is_rejected() {
+    let output = validate("version: 1\nenvironments:\n  - name: staging\n    wait_timer: 50000\n");
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn a_reviewer_that_is_both_a_user_and_a_team_is_rejected() {
+    let output = validate(
+        "version: 1\nenvironments:\n  - name: staging\n    reviewers:\n      - user: octocat\n        team: eng\n",
+    );
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn an_empty_custom_branch_policy_is_rejected() {
+    let output = validate(
+        "version: 1\nenvironments:\n  - name: staging\n    deployment_branch_policy:\n      branches: []\n",
+    );
+    output.expect_status(1);
+    assert_snapshot!(output.stderr);
+}
+
+#[test]
+fn prevent_self_review_without_reviewers_is_only_a_warning() {
+    // It does nothing, silently, which is worth saying — but it breaks nothing.
+    let output = validate(
+        "version: 1\nenvironments:\n  - name: staging\n    reviewers: []\n    prevent_self_review: true\n",
+    );
+    output.expect_status(0);
+    assert_snapshot!(output.stderr);
+}

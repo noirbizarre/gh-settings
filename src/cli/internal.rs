@@ -136,23 +136,41 @@ pub fn requirements() -> String {
     }
 
     // The `GITHUB_TOKEN` column is the one people get wrong, so spell out why
-    // rather than leaving a bare ✘ to be interpreted.
-    let blocked: Vec<String> = registry
-        .all()
-        .filter(|resource| !resource.requirement().github_token_capable)
-        .map(|resource| format!("`{}`", resource.id()))
-        .collect();
+    // rather than leaving a bare ✘ to be interpreted. Grouped by the reason:
+    // `Administration: write` and `Variables: write` are both ungrantable, but
+    // they are different permissions and saying otherwise sends people looking
+    // in the wrong place.
+    let mut blocked: Vec<(&'static str, Vec<String>)> = Vec::new();
+    for resource in registry.all() {
+        let requirement = resource.requirement();
+        if requirement.github_token_capable {
+            continue;
+        }
+        let Some(note) = requirement.github_token_note else {
+            continue;
+        };
+        let label = format!("`{}`", resource.id());
+        match blocked.iter_mut().find(|(reason, _)| *reason == note) {
+            Some((_, labels)) => labels.push(label),
+            None => blocked.push((note, vec![label])),
+        }
+    }
 
     let inheritance_note = Requirement::CONTENTS.github_token_note;
 
-    if !blocked.is_empty() {
+    for (note, labels) in &blocked {
+        // The note is phrased for a single resource ("requires X"); a group of
+        // them needs the plural verb.
+        let (verb, reason) = match note.strip_prefix("requires ") {
+            Some(reason) if labels.len() > 1 => ("require ", reason),
+            _ => ("", *note),
+        };
         let _ = writeln!(out);
         let _ = writeln!(
             out,
-            "{} require `Administration: write`, which **cannot be granted** to the \
-             Actions `GITHUB_TOKEN` — the workflow `permissions:` block has no \
-             `administration` key. Use a personal access token or a GitHub App token.",
-            join_with_and(&blocked)
+            "{} {verb}{reason} — the workflow `permissions:` block has no key that \
+             grants it. Use a personal access token or a GitHub App token.",
+            join_with_and(labels)
         );
     }
 
@@ -458,7 +476,12 @@ mod tests {
         // is answered inline instead.
         let table = requirements();
         assert!(table.contains("cannot be granted"), "{table}");
-        assert!(table.contains("no `administration` key"), "{table}");
+
+        // Each ungrantable permission is named separately: `Administration` and
+        // `Variables` are different permissions, and lumping them together
+        // would send half the readers looking in the wrong place.
+        assert!(table.contains("require Administration: write"), "{table}");
+        assert!(table.contains("requires Variables: write"), "{table}");
     }
 
     #[test]

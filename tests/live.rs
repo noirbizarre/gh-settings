@@ -251,3 +251,81 @@ fn live_doctor_reports_the_real_credential() {
         output.stdout
     );
 }
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_environments_carry_their_protection_rules() {
+    let live = live_or_skip!();
+
+    live.config(&only("environments:\n  - name: gh-settings-live\n"));
+    live.run(&["sync", "--yes", "--only", "environments"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "environments"])
+        .expect_up_to_date();
+
+    // Every protection rule at once: the wait timer, the branch policy and the
+    // explicit `null` reviewers state that the stub suite can only simulate.
+    live.config(&only(
+        "environments:\n  - name: gh-settings-live\n    wait_timer: 5\n    reviewers: []\n    deployment_branch_policy:\n      branches: [\"main\", \"release/*\"]\n      tags: [\"v*\"]\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "environments"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "environments"])
+        .expect_up_to_date();
+
+    // Removing a pattern and keeping the rest: the delete goes by server id,
+    // which only a real response supplies.
+    live.config(&only(
+        "environments:\n  - name: gh-settings-live\n    wait_timer: 5\n    reviewers: []\n    deployment_branch_policy:\n      branches: [\"main\"]\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "environments"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "environments"])
+        .expect_up_to_date();
+
+    // Back to zero, which GitHub stores as no rule at all rather than as zero.
+    live.config(&only(
+        "environments:\n  - name: gh-settings-live\n    wait_timer: 0\n    deployment_branch_policy: null\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "environments"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "environments"])
+        .expect_up_to_date();
+
+    live.cleanup();
+}
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_variables_at_both_scopes() {
+    let live = live_or_skip!();
+
+    // The environment does not exist yet when the plan is computed, so this
+    // also exercises the 404-means-no-variables path against real GitHub.
+    live.config(&only(
+        "variables:\n  - name: GH_SETTINGS_LIVE\n    value: one\nenvironments:\n  - name: gh-settings-live\n    variables:\n      - name: GH_SETTINGS_LIVE\n        value: scoped\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "environments,variables"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "environments,variables"])
+        .expect_up_to_date();
+
+    // The same name at both scopes must stay two distinct variables.
+    live.config(&only(
+        "variables:\n  - name: GH_SETTINGS_LIVE\n    value: two\nenvironments:\n  - name: gh-settings-live\n    variables:\n      - name: GH_SETTINGS_LIVE\n        value: scoped\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "environments,variables"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "environments,variables"])
+        .expect_up_to_date();
+
+    // GitHub echoes names uppercased; a lowercase declaration must match rather
+    // than be planned as a creation that then fails with a 409.
+    live.config(&only(
+        "variables:\n  - name: gh_settings_live\n    value: two\n",
+    ));
+    live.run(&["plan", "--only", "variables"])
+        .expect_up_to_date();
+
+    live.cleanup();
+}

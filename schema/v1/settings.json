@@ -106,6 +106,35 @@
       },
       "type": "object"
     },
+    "DeploymentBranchPolicy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProtectedKeyword",
+          "description": "Only branches with protection rules or a matching ruleset."
+        },
+        {
+          "description": "Explicit branch and tag name patterns.",
+          "properties": {
+            "branches": {
+              "description": "Branch name patterns, for example `main` or `release/*`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tags": {
+              "description": "Tag name patterns, for example `v*`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      ],
+      "description": "Which refs may deploy to an environment."
+    },
     "Enforcement": {
       "description": "How strictly a ruleset is applied.",
       "oneOf": [
@@ -125,6 +154,67 @@
           "type": "string"
         }
       ]
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "description": "A deployment environment.",
+      "properties": {
+        "deployment_branch_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeploymentBranchPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which refs may deploy to this environment.\n\nThree states, and the difference between the last two matters: omitting\nthe field leaves the policy alone, whereas an explicit `null` sets it to\n*any branch*, which is GitHub's own default and a real setting.\n\n```yaml\ndeployment_branch_policy: protected      # protected branches only\ndeployment_branch_policy:                # explicit patterns\n  branches: [main, \"release/*\"]\n  tags: [\"v*\"]\ndeployment_branch_policy: null           # any branch\n```"
+        },
+        "name": {
+          "description": "The environment name, for example `production`.\n\nGitHub matches names case-insensitively, so `Production` and\n`production` are the same environment. Names may contain spaces and\nslashes.",
+          "type": "string"
+        },
+        "prevent_self_review": {
+          "description": "Whether the user who triggered a deployment may approve it themselves.\n\nOnly meaningful alongside `reviewers`: with nobody to review, there is\nno approval to prevent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reviewers": {
+          "description": "Who must approve a deployment to this environment.\n\nOmitted leaves reviewers unmanaged; an empty list removes them all.",
+          "items": {
+            "$ref": "#/$defs/Reviewer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "variables": {
+          "description": "Actions variables scoped to this environment.\n\nOmitting the key leaves the environment's variables unmanaged; an empty\nlist declares that it should have none. Whether unmanaged variables are\ndeleted is governed by the `environments` section's `prune` flag, since\na variable cannot be pruned independently of the environment holding it.",
+          "items": {
+            "$ref": "#/$defs/Variable"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "wait_timer": {
+          "description": "Minutes to wait before a deployment to this environment may proceed.\n\nBetween 0 and 43200 (30 days). Zero and an omitted timer are the same\nstate to GitHub, so setting it back to zero removes the rule.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
     },
     "Label": {
       "additionalProperties": false,
@@ -190,6 +280,16 @@
         {
           "const": "MERGE_MESSAGE",
           "description": "The default `Merge pull request #N` title.",
+          "type": "string"
+        }
+      ]
+    },
+    "ProtectedKeyword": {
+      "description": "The only word accepted where a policy keyword is expected.",
+      "oneOf": [
+        {
+          "const": "protected",
+          "description": "Restrict deployments to protected branches.",
           "type": "string"
         }
       ]
@@ -309,6 +409,72 @@
               "description": "The declared items.\n\nModelled as an `Option` rather than a defaulted `Vec` so the section\ndoes not require its item type to implement `Default`.",
               "items": {
                 "$ref": "#/$defs/Ruleset"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "prune": {
+              "default": false,
+              "description": "Delete items that exist on GitHub but are absent here.\n\nDefaults to `false`. Overridden by `--prune` / `--no-prune`.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      ],
+      "description": "A collection section that can opt into pruning."
+    },
+    "Prunable5": {
+      "anyOf": [
+        {
+          "description": "Bare list form. Additive: unmanaged items are left alone.",
+          "items": {
+            "$ref": "#/$defs/Environment"
+          },
+          "type": "array"
+        },
+        {
+          "description": "Object form, able to enable pruning.",
+          "properties": {
+            "items": {
+              "description": "The declared items.\n\nModelled as an `Option` rather than a defaulted `Vec` so the section\ndoes not require its item type to implement `Default`.",
+              "items": {
+                "$ref": "#/$defs/Environment"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "prune": {
+              "default": false,
+              "description": "Delete items that exist on GitHub but are absent here.\n\nDefaults to `false`. Overridden by `--prune` / `--no-prune`.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      ],
+      "description": "A collection section that can opt into pruning."
+    },
+    "Prunable6": {
+      "anyOf": [
+        {
+          "description": "Bare list form. Additive: unmanaged items are left alone.",
+          "items": {
+            "$ref": "#/$defs/Variable"
+          },
+          "type": "array"
+        },
+        {
+          "description": "Object form, able to enable pruning.",
+          "properties": {
+            "items": {
+              "description": "The declared items.\n\nModelled as an `Option` rather than a defaulted `Vec` so the section\ndoes not require its item type to implement `Default`.",
+              "items": {
+                "$ref": "#/$defs/Variable"
               },
               "type": [
                 "array",
@@ -540,6 +706,27 @@
       },
       "type": "object"
     },
+    "Reviewer": {
+      "additionalProperties": false,
+      "description": "Who must approve a deployment.\n\nDeclared by login or slug rather than by numeric identifier: identifiers are\nneither stable across organisations nor meaningful to a human, which would\nmake an exported configuration useless anywhere but its origin. Resolution\nto identifiers happens in `prepare`, before anything is written.",
+      "properties": {
+        "team": {
+          "description": "An organisation team slug.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "description": "A user login.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "Rule": {
       "additionalProperties": false,
       "description": "A single rule within a ruleset.\n\nModelled as `{ type, parameters }` rather than a closed enum of every known\nrule so that a rule type this build predates round-trips untouched instead of\nbeing silently dropped.",
@@ -702,6 +889,25 @@
           "type": "string"
         }
       ]
+    },
+    "Variable": {
+      "additionalProperties": false,
+      "description": "A single Actions variable.",
+      "properties": {
+        "name": {
+          "description": "The variable name, for example `DEPLOY_URL`.\n\nGitHub uppercases names and matches them case-insensitively, so `api_url`\nand `API_URL` are the same variable. Names may contain only letters,\ndigits and underscores, may not start with a digit, and may not start\nwith `GITHUB_`.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value.\n\nStored and compared verbatim: leading and trailing whitespace is\nsignificant, because a workflow will see exactly what is written here.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://noirbizarre.github.io/gh-settings/schema/v1/settings.json",
@@ -719,6 +925,17 @@
         }
       ],
       "description": "Autolink references."
+    },
+    "environments": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Prunable5"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Deployment environments and their protection rules.\n\nEnvironment-scoped Actions variables are declared inside each\nenvironment, under `variables`.\n\nNote that inheritance replaces an environment whole: a file that extends\nanother and redeclares `production` merely to change its `wait_timer`\nalso replaces the inherited `variables` and `reviewers` lists."
     },
     "extends": {
       "description": "Inherit this configuration from another repository.\n\nWritten as `owner/repo[/path/to/file]@ref`. The path is optional and\ndefaults to `.github/settings.yml`, so:\n\n- `acme/.github@v1` reads `.github/settings.yml` from `acme/.github`\n- `acme/.github/config/base.yml@v1` reads that file instead\n\nThe ref is required, so a shared base cannot move underneath a plan that\nwas reviewed against it.\n\nAnything the local file declares wins. Collections are merged by item\nidentity — a label of the same name replaces the inherited one outright —\nand `prune` is never inherited, so editing a shared file cannot start\ndeleting things in the repositories that extend it.\n\nA base configuration may not itself use `extends`.",
@@ -770,6 +987,17 @@
         }
       ],
       "description": "Repository topics.\n\nAlso accepted under `repository.topics` for `safe-settings`\ncompatibility; declaring both is an error."
+    },
+    "variables": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Prunable6"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Repository-scoped Actions variables.\n\nEnvironment-scoped variables live under `environments[].variables`\ninstead."
     },
     "version": {
       "description": "Schema major version this file targets.",

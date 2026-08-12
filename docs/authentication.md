@@ -35,8 +35,9 @@ statuses, pages
 
 **There is no `administration` key.** It cannot be requested at any value.
 
-Repository metadata, topics, autolinks and rulesets all require
-`Administration: write`. They are therefore *structurally* unavailable to
+Repository metadata, topics, autolinks, rulesets and environments all require
+`Administration: write`, and Actions variables require `Variables: write`.
+Neither key exists in that list, so they are *structurally* unavailable to
 `GITHUB_TOKEN` — this is not a permission you forgot to enable, it cannot be
 granted at all.
 
@@ -112,10 +113,11 @@ The App needs the repository permissions listed below.
 | Permission | Level | Needed for |
 |---|---|---|
 | **Metadata** | Read | Mandatory baseline for every fine-grained token |
-| **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets` |
+| **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets`, `environments` |
 | **Issues** | Read & write | `labels` |
+| **Variables** | Read & write | `variables`, including the ones nested under an environment |
 | **Contents** | Read | Reading a base named in `extends:` — **on that repository**, not this one |
-| *Organization → Members* | Read | Resolving `bypass_actors: [{ team: … }]` (organisation repositories only) |
+| *Organization → Members* | Read | Resolving `bypass_actors: [{ team: … }]` and environment reviewers named by team (organisation repositories only) |
 
 Fine-grained tokens do not report their permissions through the API. `doctor`
 will therefore say **unknown** rather than guessing, and fall back to probing
@@ -151,9 +153,15 @@ actually enforces.
 | `labels` | Metadata: read, Issues: write | `repo` | ✔ |
 | `autolinks` | Metadata: read, Administration: write | `repo` | ✘ |
 | `rulesets` | Metadata: read, Administration: write | `repo` | ✘ |
+| `environments` | Metadata: read, Administration: write | `repo` | ✘ |
+| `variables` | Metadata: read, Variables: write † | `repo` | ✘ |
 | `extends` | Contents: read | `repo` | ✘ |
 
-`repository`, `topics`, `autolinks` and `rulesets` require `Administration: write`, which **cannot be granted** to the Actions `GITHUB_TOKEN` — the workflow `permissions:` block has no `administration` key. Use a personal access token or a GitHub App token.
+† This mapping is inferred rather than confirmed against GitHub's own reference. It is our best understanding, not a guarantee; `gh settings doctor` will tell you what your token can actually do.
+
+`repository`, `topics`, `autolinks`, `rulesets` and `environments` require Administration: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
+
+`variables` requires Variables: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
 
 `extends` is not a resource — it is read while loading the configuration — and it requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have.
 

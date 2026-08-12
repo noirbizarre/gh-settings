@@ -1,0 +1,14 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:9]
+ 3 |       - name: staging
+ 4 |         reviewers:
+ 5 | ,->       - user: octocat
+ 6 | |->         team: eng
+   : `---- declares both `user` and `team`
+   `----

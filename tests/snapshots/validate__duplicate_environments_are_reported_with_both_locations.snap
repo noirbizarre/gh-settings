@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:4:11]
+ 2 | environments:
+ 3 |   - name: staging
+ 4 |   - name: Staging
+   :           ^^^|^^^
+   :              `-- already declared at environments.0
+   `----
+  help: environment names are case-insensitive on GitHub; remove the duplicate

@@ -136,6 +136,13 @@ was read at, taken from the ETag the fetch already returns.
   rule sorted into the position, and a configuration using only
   `repository.topics` panicked a debug build.
 
+* Replace-by-identity applies to large items too. A child that redeclares an
+  environment merely to change its `wait_timer` also replaces the inherited
+  `reviewers` and `variables` lists — consistent with labels, but the surprise
+  grows with the size of the item. Field-wise merging would reintroduce exactly
+  the omitted-versus-defaulted ambiguity this record exists to avoid, so the
+  behaviour is documented rather than special-cased.
+
 ### Open
 
 Per-item provenance assumes each merged item came from exactly one document,

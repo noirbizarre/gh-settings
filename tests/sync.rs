@@ -1200,3 +1200,274 @@ fn sync_rejects_an_invalid_configuration_in_the_requested_format() {
         output.writes()
     );
 }
+
+// ---------------------------------------------------------------------------
+// Environments and variables
+// ---------------------------------------------------------------------------
+
+/// The environment list endpoint, with the page size the resource asks for.
+const ENVIRONMENTS: &str = "repos/o/r/environments?per_page=100";
+
+#[test]
+fn environments_are_created_before_their_variables() {
+    // A variable cannot be written into an environment that does not exist, so
+    // the ordering declared through `depends_on` has to survive all the way to
+    // the request log. This is the property ADR-011 exists for.
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nenvironments:\n  - name: staging\n    variables:\n      - name: URL\n        value: https://staging\n",
+        )
+        .accept("PUT", "repos/o/r/environments/staging")
+        .respond(
+            "POST",
+            "repos/o/r/environments/staging/variables",
+            Fixture::created("{}"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 2, "{writes:?}");
+    assert!(
+        writes[0].starts_with("PUT repos/o/r/environments/staging"),
+        "{writes:?}"
+    );
+    assert!(
+        writes[1].starts_with("POST repos/o/r/environments/staging/variables"),
+        "{writes:?}"
+    );
+}
+
+#[test]
+fn a_variable_in_an_environment_that_does_not_exist_yet_is_planned_as_a_creation() {
+    // Planning happens entirely before applying, so this read hits an
+    // environment that is not there yet. A 404 means "no variables", not
+    // "something went wrong".
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nenvironments:\n  - name: staging\n    variables:\n      - name: URL\n        value: https://staging\n",
+        )
+        .respond(
+            "GET",
+            "repos/o/r/environments/staging/variables?per_page=100",
+            Fixture::error(404, "{\"message\": \"Not Found\"}"),
+        )
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(2);
+    assert!(
+        output.stdout.contains("create staging variable URL"),
+        "{}",
+        output.stdout
+    );
+}
+
+#[test]
+fn a_forbidden_variable_read_is_not_mistaken_for_an_empty_one() {
+    // "You may not look" must never be silently read as "there is nothing
+    // there", or a plan would propose creating variables that already exist.
+    let runner = Sandbox::new()
+        .config("version: 1\nvariables:\n  - name: REGION\n    value: eu\n")
+        .respond(
+            "GET",
+            "repos/o/r/actions/variables?per_page=100",
+            Fixture::error(403, "{\"message\": \"Resource not accessible\"}"),
+        )
+        .build();
+
+    runner.run(&["plan", "-R", "o/r"]).expect_status(1);
+}
+
+#[test]
+fn plan_does_not_read_environments_or_variables_when_they_are_unmanaged() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    for endpoint in ["/environments", "/variables"] {
+        assert!(
+            !output.requests.iter().any(|r| r.contains(endpoint)),
+            "read {endpoint} despite it being unmanaged: {:?}",
+            output.requests
+        );
+    }
+}
+
+#[test]
+fn a_repository_variable_is_updated_in_place() {
+    let runner = Sandbox::new()
+        .config("version: 1\nvariables:\n  - name: REGION\n    value: us\n")
+        .get(
+            "repos/o/r/actions/variables?per_page=100",
+            r#"{"total_count": 1, "variables": [{"name": "REGION", "value": "eu"}]}"#,
+        )
+        .accept("PATCH", "repos/o/r/actions/variables/REGION")
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(writes[0].contains("\"value\":\"us\""), "{}", writes[0]);
+}
+
+#[test]
+fn a_branch_pattern_change_deletes_before_it_creates() {
+    // GitHub answers a duplicate pattern name with a 422 rather than merging,
+    // so the order within a single change matters.
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nenvironments:\n  - name: staging\n    deployment_branch_policy:\n      branches: [main]\n",
+        )
+        .get(
+            ENVIRONMENTS,
+            r#"{"total_count": 1, "environments": [{"name": "staging", "protection_rules": [{"type": "branch_policy"}], "deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}]}"#,
+        )
+        .get(
+            "repos/o/r/environments/staging/deployment-branch-policies?per_page=100",
+            r#"{"total_count": 1, "branch_policies": [{"id": 9, "name": "stale", "type": "branch"}]}"#,
+        )
+        .accept("PUT", "repos/o/r/environments/staging")
+        .accept(
+            "DELETE",
+            "repos/o/r/environments/staging/deployment-branch-policies/9",
+        )
+        .respond(
+            "POST",
+            "repos/o/r/environments/staging/deployment-branch-policies",
+            Fixture::created("{}"),
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 3, "{writes:?}");
+    assert!(writes[0].starts_with("PUT repos/o/r/environments/staging "));
+    assert!(
+        writes[1].starts_with("DELETE repos/o/r/environments/staging/deployment-branch-policies/9")
+    );
+    assert!(
+        writes[2].starts_with("POST repos/o/r/environments/staging/deployment-branch-policies")
+    );
+    assert!(writes[2].contains("\"name\":\"main\""), "{}", writes[2]);
+}
+
+#[test]
+fn pruning_an_environment_is_reported_as_destructive() {
+    let runner = Sandbox::new()
+        .config("version: 1\nenvironments:\n  prune: true\n  items:\n    - name: staging\n")
+        .get(
+            ENVIRONMENTS,
+            r#"{"total_count": 2, "environments": [{"name": "staging", "protection_rules": []}, {"name": "legacy", "protection_rules": []}]}"#,
+        )
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(2);
+    assert!(
+        output.stdout.contains(
+            "delete environment legacy (also deletes its variables, secrets and deployment history)"
+        ),
+        "{}",
+        output.stdout
+    );
+}
+
+#[test]
+fn sync_leaves_an_unmanaged_environment_alone() {
+    let runner = Sandbox::new()
+        .config("version: 1\nenvironments:\n  - name: staging\n")
+        .get(
+            ENVIRONMENTS,
+            r#"{"total_count": 2, "environments": [{"name": "staging", "protection_rules": []}, {"name": "legacy", "protection_rules": []}]}"#,
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+}
+
+#[test]
+fn a_reviewer_slug_is_resolved_before_anything_is_written() {
+    let runner = Sandbox::new()
+        .config("version: 1\nenvironments:\n  - name: staging\n    reviewers:\n      - team: eng\n")
+        .get("orgs/o/teams/eng", r#"{"id": 7}"#)
+        .accept("PUT", "repos/o/r/environments/staging")
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(
+        writes[0].contains(r#""reviewers":[{"id":7,"type":"Team"}]"#),
+        "{}",
+        writes[0]
+    );
+}
+
+#[test]
+fn a_misspelled_reviewer_fails_the_plan_rather_than_a_half_finished_apply() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nenvironments:\n  - name: staging\n    reviewers:\n      - team: nosuchteam\n",
+        )
+        .respond(
+            "GET",
+            "orgs/o/teams/nosuchteam",
+            Fixture::error(404, "{\"message\": \"Not Found\"}"),
+        )
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(1);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+    assert!(output.stderr.contains("nosuchteam"), "{}", output.stderr);
+}
+
+#[test]
+fn syncing_environments_is_idempotent() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nenvironments:\n  - name: staging\n    wait_timer: 30\n    reviewers: []\n    deployment_branch_policy: null\n",
+        )
+        .get(
+            ENVIRONMENTS,
+            r#"{"total_count": 1, "environments": [{"name": "staging", "protection_rules": [{"type": "wait_timer", "wait_timer": 30}], "deployment_branch_policy": null}]}"#,
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+}
+
+#[test]
+fn plan_renders_environments_and_variables() {
+    // Verbose, destructive, and spanning both scopes: the shape most likely to
+    // read badly if a summary or a field diff is wrong.
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nenvironments:\n  prune: true\n  items:\n    - name: production\n      wait_timer: 15\n      reviewers:\n        - team: engineering\n      deployment_branch_policy:\n        branches: [main]\n      variables:\n        - name: DEPLOY_URL\n          value: https://example.com\nvariables:\n  - name: DEFAULT_REGION\n    value: eu-west-1\n",
+        )
+        .get("orgs/o/teams/engineering", r#"{"id": 7}"#)
+        .get(
+            ENVIRONMENTS,
+            r#"{"total_count": 1, "environments": [{"name": "legacy", "protection_rules": []}]}"#,
+        )
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r", "-v"]);
+    output.expect_status(2);
+    assert_cli_snapshot!(output.stdout);
+}

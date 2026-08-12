@@ -14,10 +14,12 @@ pub mod change;
 pub mod requirement;
 
 pub mod autolinks;
+pub mod environments;
 pub mod labels;
 pub mod repository;
 pub mod rulesets;
 pub mod topics;
+pub mod variables;
 
 pub use change::{Change, Counts, FieldDiff, Op};
 pub use requirement::{Access, Capability, Requirement};
@@ -46,6 +48,10 @@ pub enum ResourceId {
     Autolinks,
     /// Repository rulesets.
     Rulesets,
+    /// Deployment environments and their protection rules.
+    Environments,
+    /// Actions variables, at repository and environment scope.
+    Variables,
 }
 
 impl ResourceId {
@@ -56,6 +62,8 @@ impl ResourceId {
         Self::Labels,
         Self::Autolinks,
         Self::Rulesets,
+        Self::Environments,
+        Self::Variables,
     ];
 
     /// The identifier as it appears in `--only`, plan output and JSON.
@@ -66,6 +74,8 @@ impl ResourceId {
             Self::Labels => "labels",
             Self::Autolinks => "autolinks",
             Self::Rulesets => "rulesets",
+            Self::Environments => "environments",
+            Self::Variables => "variables",
         }
     }
 
@@ -77,6 +87,8 @@ impl ResourceId {
             Self::Labels => "Labels",
             Self::Autolinks => "Autolinks",
             Self::Rulesets => "Rulesets",
+            Self::Environments => "Environments",
+            Self::Variables => "Variables",
         }
     }
 

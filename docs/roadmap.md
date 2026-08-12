@@ -20,8 +20,9 @@ eventually be manageable here.*
 | Autolinks | ✅ | changes are delete-and-recreate; GitHub has no update endpoint |
 | Rulesets | ✅ | unknown rule types round-trip untouched rather than being dropped |
 | Inheritance (`extends:`) | ✅ | single level, ref pinned, `prune` never inherited |
+| Environments | ✅ | protection rules, reviewers and deployment branch policies |
+| Actions variables | ✅ | repository and environment scope; values are readable, so they diff |
 | Custom properties | planned | |
-| Environments & variables | planned | variables are readable, so they can be diffed |
 | Webhooks | planned | |
 | Pages | planned | |
 | Collaborators & teams | planned | |

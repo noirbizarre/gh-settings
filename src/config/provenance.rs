@@ -22,7 +22,14 @@ use super::source::SourceId;
 use super::spans::SpanIndex;
 
 /// Collection sections, which are the ones whose physical path can differ.
-const SECTIONS: &[&str] = &["topics", "labels", "autolinks", "rulesets"];
+const SECTIONS: &[&str] = &[
+    "topics",
+    "labels",
+    "autolinks",
+    "rulesets",
+    "environments",
+    "variables",
+];
 
 /// Maps logical configuration paths to the document and path that produced them.
 ///
@@ -133,6 +140,11 @@ fn section_len(settings: &Settings, section: &str) -> usize {
         "labels" => settings.labels.as_ref().map_or(0, |s| s.items().len()),
         "autolinks" => settings.autolinks.as_ref().map_or(0, |s| s.items().len()),
         "rulesets" => settings.rulesets.as_ref().map_or(0, |s| s.items().len()),
+        "environments" => settings
+            .environments
+            .as_ref()
+            .map_or(0, |s| s.items().len()),
+        "variables" => settings.variables.as_ref().map_or(0, |s| s.items().len()),
         other => unreachable!("unknown collection section `{other}`"),
     }
 }
@@ -166,6 +178,51 @@ mod tests {
         assert_eq!(
             provenance.resolve("labels.0.color"),
             Some((SourceId::ROOT, "labels.items.0.color".to_string()))
+        );
+    }
+
+    #[test]
+    fn every_collection_section_is_rewritten_through_items() {
+        // `section_len` panics on an unknown section, so a section added to the
+        // schema but forgotten here blows up the first time somebody uses the
+        // object form rather than at compile time.
+        for (section, item) in [
+            ("topics", "- rust"),
+            ("labels", "- name: bug\n      color: d73a4a"),
+            (
+                "autolinks",
+                "- key_prefix: 'OPS-'\n      url_template: https://e/<num>",
+            ),
+            ("rulesets", "- name: main"),
+            ("environments", "- name: staging"),
+            ("variables", "- name: A\n      value: b"),
+        ] {
+            let (_, _, provenance) = document(&format!(
+                "{section}:\n  prune: true\n  items:\n    {item}\n"
+            ));
+            assert_eq!(
+                provenance.resolve(&format!("{section}.0")),
+                Some((SourceId::ROOT, format!("{section}.items.0"))),
+                "{section} was not rewritten"
+            );
+        }
+    }
+
+    #[test]
+    fn a_nested_collection_resolves_through_its_parents_rewrite() {
+        // Nothing records `environments.0.variables` itself: the longest-prefix
+        // rewrite of `environments.0` carries the remainder along, which is why
+        // the nested list is a plain `Vec` and not a `Prunable`.
+        let (_, _, provenance) = document(
+            "environments:\n  prune: true\n  items:\n    - name: staging\n      variables:\n        - name: A\n          value: b\n",
+        );
+
+        assert_eq!(
+            provenance.resolve("environments.0.variables.0.name"),
+            Some((
+                SourceId::ROOT,
+                "environments.items.0.variables.0.name".to_string()
+            ))
         );
     }
 

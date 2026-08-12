@@ -1,13 +1,13 @@
 //! The resource registry.
 //!
-//! Holds every resource and guarantees a dependency-respecting order. No v1
-//! resource declares a dependency, but environments will need their variables
-//! applied afterwards, and rulesets may come to reference custom properties.
-//! Topological ordering costs little now and cannot be retrofitted cheaply.
+//! Holds every resource and guarantees a dependency-respecting order.
+//! `variables` depends on `environments`, because a variable cannot be written
+//! into an environment that does not exist yet; rulesets may come to reference
+//! custom properties the same way.
 
 use crate::resources::{
-    ErasedResource, ResourceId, autolinks::Autolinks, labels::Labels, repository::Repository,
-    rulesets::Rulesets, topics::Topics,
+    ErasedResource, ResourceId, autolinks::Autolinks, environments::Environments, labels::Labels,
+    repository::Repository, rulesets::Rulesets, topics::Topics, variables::Variables,
 };
 
 /// The ordered set of resources the engine orchestrates.
@@ -26,6 +26,8 @@ impl Default for Registry {
             Box::new(Labels),
             Box::new(Autolinks),
             Box::new(Rulesets),
+            Box::new(Environments),
+            Box::new(Variables),
         ])
     }
 }
@@ -146,7 +148,25 @@ mod tests {
                 ResourceId::Labels,
                 ResourceId::Autolinks,
                 ResourceId::Rulesets,
+                ResourceId::Environments,
+                ResourceId::Variables,
             ]
+        );
+    }
+
+    #[test]
+    fn a_dependency_is_ordered_before_the_resource_that_declares_it() {
+        // Declared the wrong way round on purpose: a variable cannot be written
+        // into an environment that does not exist yet, so the sort has to move
+        // `environments` in front regardless of how the registry was written.
+        let registry = Registry::new(vec![
+            Box::new(crate::resources::variables::Variables),
+            Box::new(crate::resources::environments::Environments),
+        ]);
+
+        assert_eq!(
+            ids(&registry),
+            vec![ResourceId::Environments, ResourceId::Variables]
         );
     }
 

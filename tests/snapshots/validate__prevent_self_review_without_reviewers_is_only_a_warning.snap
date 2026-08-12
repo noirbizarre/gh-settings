@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  ! configuration has 1 warning
+   ,-[[CONFIG]:5:26]
+ 3 |   - name: staging
+ 4 |     reviewers: []
+ 5 |     prevent_self_review: true
+   :                          ^^|^
+   :                            `-- `prevent_self_review` has no effect without reviewers
+   `----
+  help: add `reviewers`, or remove the flag

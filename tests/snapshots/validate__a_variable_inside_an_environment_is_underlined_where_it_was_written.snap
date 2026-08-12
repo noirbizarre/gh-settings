@@ -1,0 +1,16 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:15]
+ 3 |   - name: staging
+ 4 |     variables:
+ 5 |       - name: GITHUB_X
+   :               ^^^^|^^^
+   :                   `-- reserved prefix
+ 6 |         value: x
+   `----
+  help: GitHub reserves `GITHUB_*` for the variables it sets itself

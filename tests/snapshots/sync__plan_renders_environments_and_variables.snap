@@ -1,0 +1,21 @@
+---
+source: tests/sync.rs
+expression: output.stdout
+---
+Plan for o/r
+
+Environments
+  + create environment production
+      wait_timer: 15
+      reviewers: team engineering
+      deployment_branch_policy: custom (branch main)
+  - delete environment legacy (also deletes its variables, secrets and deployment history)
+
+Variables
+  + create repository variable DEFAULT_REGION
+      value: eu-west-1
+  + create production variable DEPLOY_URL
+      value: https://example.com
+
+3 to create, 1 to delete.
+! this plan deletes existing configuration.

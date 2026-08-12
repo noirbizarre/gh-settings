@@ -1,0 +1,16 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:11]
+ 3 |   - name: region
+ 4 |     value: eu
+ 5 |   - name: REGION
+   :           ^^^|^^
+   :              `-- already declared at variables.0
+ 6 |     value: us
+   `----
+  help: variable names are case-insensitive on GitHub; remove the duplicate

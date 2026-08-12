@@ -9,8 +9,10 @@ Environment
     Scopes           not reported by this token type
 
 Resources
-  ? repository  cannot determine from this token type
-  ? topics      cannot determine from this token type
-  ? labels      cannot determine from this token type
-  ? autolinks   cannot determine from this token type
-  ? rulesets    cannot determine from this token type
+  ? repository    cannot determine from this token type
+  ? topics        cannot determine from this token type
+  ? labels        cannot determine from this token type
+  ? autolinks     cannot determine from this token type
+  ? rulesets      cannot determine from this token type
+  ? environments  cannot determine from this token type
+  ? variables     cannot determine from this token type

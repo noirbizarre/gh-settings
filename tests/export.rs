@@ -178,6 +178,12 @@ fn omits_sections_the_repository_has_nothing_for() {
     output.expect_status(0);
     assert!(!output.stdout.contains("topics:"), "{}", output.stdout);
     assert!(!output.stdout.contains("labels:"), "{}", output.stdout);
+    assert!(
+        !output.stdout.contains("environments:"),
+        "{}",
+        output.stdout
+    );
+    assert!(!output.stdout.contains("variables:"), "{}", output.stdout);
 }
 
 #[test]
@@ -231,4 +237,125 @@ fn export_renders_a_repository_with_nothing_to_export() {
     let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
     output.expect_status(0);
     assert_cli_snapshot!(output.stdout);
+}
+
+/// An environment with every protection rule set, as the API reports one.
+const ENVIRONMENTS_BODY: &str = r#"{
+    "total_count": 1,
+    "environments": [{
+        "name": "production",
+        "protection_rules": [
+            {"type": "wait_timer", "wait_timer": 30},
+            {
+                "type": "required_reviewers",
+                "prevent_self_review": true,
+                "reviewers": [{"type": "Team", "reviewer": {"id": 7, "slug": "eng"}}]
+            },
+            {"type": "branch_policy"}
+        ],
+        "deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}
+    }]
+}"#;
+
+fn with_environments() -> Sandbox {
+    populated()
+        .get("repos/o/r/environments?per_page=100", ENVIRONMENTS_BODY)
+        .get(
+            "repos/o/r/environments/production/deployment-branch-policies?per_page=100",
+            r#"{"total_count": 1, "branch_policies": [{"id": 9, "name": "main", "type": "branch"}]}"#,
+        )
+        .get(
+            "repos/o/r/environments/production/variables?per_page=100",
+            r#"{"total_count": 1, "variables": [{"name": "URL", "value": "https://example.com"}]}"#,
+        )
+        .get(
+            "repos/o/r/actions/variables?per_page=100",
+            r#"{"total_count": 1, "variables": [{"name": "REGION", "value": "eu"}]}"#,
+        )
+}
+
+#[test]
+fn environment_variables_are_exported_inside_their_environment() {
+    // One resource writes both scopes, but the engine files an exported section
+    // under the resource's own name — so the `environments` resource is the only
+    // thing that can emit these (ADR-018).
+    let output = with_environments()
+        .build()
+        .run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+
+    let value: serde_norway::Value =
+        serde_norway::from_str(&output.stdout).expect("valid configuration");
+    let environment = &value["environments"][0];
+
+    assert_eq!(environment["name"], "production");
+    assert_eq!(environment["variables"][0]["name"], "URL");
+    assert_eq!(environment["variables"][0]["value"], "https://example.com");
+}
+
+#[test]
+fn repository_variables_are_exported_at_the_top_level() {
+    let output = with_environments()
+        .build()
+        .run(&["export", "-R", "o/r", "--stdout"]);
+
+    let value: serde_norway::Value =
+        serde_norway::from_str(&output.stdout).expect("valid configuration");
+    assert_eq!(value["variables"][0]["name"], "REGION");
+    assert_eq!(value["variables"][0]["value"], "eu");
+}
+
+#[test]
+fn exported_reviewers_use_slugs_never_identifiers() {
+    // Numeric identifiers mean nothing to a reader and nothing at all in
+    // another organisation, so an exported file carrying them would not be
+    // reusable — which is the point of exporting.
+    let output = with_environments()
+        .build()
+        .run(&["export", "-R", "o/r", "--stdout"]);
+
+    assert!(output.stdout.contains("team: eng"), "{}", output.stdout);
+    assert!(!output.stdout.contains("id:"), "{}", output.stdout);
+}
+
+#[test]
+fn exported_environments_round_trip_to_an_empty_plan() {
+    // The acceptance criterion: anything not normalised on both sides shows up
+    // here as a permanent diff.
+    let sandbox = with_environments();
+    let runner = sandbox.build();
+    runner.run(&["export", "-R", "o/r"]).expect_status(0);
+
+    let exported = common::read(runner.path(), ".github/settings.yml");
+    let output = Sandbox::new()
+        .config(&exported)
+        .repository(&default_repository())
+        .get("repos/o/r/topics", r#"{"names": ["rust", "github-cli"]}"#)
+        .get(
+            "repos/o/r/labels",
+            r#"[{"name": "bug", "color": "d73a4a", "description": "Something isn't working"}]"#,
+        )
+        .get(
+            "repos/o/r/autolinks",
+            r#"[{"id": 1, "key_prefix": "OPS-", "url_template": "https://jira.example.com/browse/<num>", "is_alphanumeric": false}]"#,
+        )
+        .get("repos/o/r/environments?per_page=100", ENVIRONMENTS_BODY)
+        .get(
+            "repos/o/r/environments/production/deployment-branch-policies?per_page=100",
+            r#"{"total_count": 1, "branch_policies": [{"id": 9, "name": "main", "type": "branch"}]}"#,
+        )
+        .get(
+            "repos/o/r/environments/production/variables?per_page=100",
+            r#"{"total_count": 1, "variables": [{"name": "URL", "value": "https://example.com"}]}"#,
+        )
+        .get(
+            "repos/o/r/actions/variables?per_page=100",
+            r#"{"total_count": 1, "variables": [{"name": "REGION", "value": "eu"}]}"#,
+        )
+        .get("orgs/o/teams/eng", r#"{"id": 7}"#)
+        .build()
+        .run(&["plan", "-R", "o/r"]);
+
+    output.expect_status(0);
+    assert!(output.stdout.contains("up to date"), "{}", output.stdout);
 }

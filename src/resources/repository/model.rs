@@ -22,7 +22,11 @@ use crate::config::Finding;
 use crate::resources::{FieldDiff, ValidateCtx};
 
 /// Deserialize into a "double option", preserving the absent/null distinction.
-fn double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+///
+/// Shared with any other resource that has a nullable field — environments'
+/// `deployment_branch_policy` is the other one — because getting it wrong is
+/// always the same bug: an absent field read as an explicit clear.
+pub fn double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,

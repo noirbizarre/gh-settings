@@ -89,6 +89,23 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
         |ruleset| ruleset.name.trim().to_string(),
     );
 
+    let environments = merge_section(
+        &mut provenance,
+        "environments",
+        base,
+        child,
+        |settings| settings.environments.as_ref(),
+        |environment| crate::resources::environments::model::key(&environment.name),
+    );
+    let variables = merge_section(
+        &mut provenance,
+        "variables",
+        base,
+        child,
+        |settings| settings.variables.as_ref(),
+        |variable| crate::resources::variables::model::key(&variable.name),
+    );
+
     let settings = Settings {
         version,
         // Consumed by the loader. Carrying it into the merged result would
@@ -100,6 +117,8 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
         labels,
         autolinks,
         rulesets,
+        environments,
+        variables,
     };
 
     (settings, provenance)

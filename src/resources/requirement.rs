@@ -123,8 +123,34 @@ impl Requirement {
         github_token_note: None,
     };
 
-    /// What it takes to read a configuration inherited from another repository.
+    /// Actions variables, at repository and at environment scope.
     ///
+    /// The fine-grained permission is spelled `Variables` in the token UI, and
+    /// it is separate from `Actions` — a token that can rerun workflows cannot
+    /// necessarily write variables.
+    ///
+    /// Marked unverified: GitHub's reference has described the *environment*-
+    /// scoped endpoints as sitting under `Actions: write` in places, and we
+    /// could not confirm from first-party documentation which is authoritative.
+    /// Per ADR-015 that is reported as uncertainty rather than asserted.
+    ///
+    /// This is not the secrets exclusion of ADR-009: variable values are
+    /// readable, so they diff, export and round-trip like anything else.
+    pub const VARIABLES: Requirement = Requirement {
+        fine_grained: &[
+            FineGrained::documented("Metadata", Access::Read),
+            FineGrained::unverified("Variables", Access::Write),
+        ],
+        classic: &["repo"],
+        // The workflow `permissions:` block has no `variables` key, so this is
+        // not a grant somebody forgot to make — it is one that cannot be made.
+        github_token_capable: false,
+        github_token_note: Some(
+            "requires Variables: write, which cannot be granted to GITHUB_TOKEN",
+        ),
+    };
+
+    /// What it takes to read a configuration inherited from another repository.
     /// Not a resource requirement: it is needed while *loading* the
     /// configuration, before any resource is consulted. Listed here because it
     /// is a permission, and this is where permissions are declared.
@@ -276,7 +302,11 @@ mod tests {
     fn every_requirement_demands_metadata_read() {
         // Fine-grained tokens are useless without it, so forgetting it in a new
         // resource would produce a table that cannot actually work.
-        for requirement in [&Requirement::ADMINISTRATION, &Requirement::ISSUES] {
+        for requirement in [
+            &Requirement::ADMINISTRATION,
+            &Requirement::ISSUES,
+            &Requirement::VARIABLES,
+        ] {
             assert!(
                 requirement
                     .fine_grained

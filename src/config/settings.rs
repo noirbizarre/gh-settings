@@ -7,9 +7,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::resources::autolinks::Autolink;
+use crate::resources::environments::Environment;
 use crate::resources::labels::Label;
 use crate::resources::repository::RepositorySettings;
 use crate::resources::rulesets::Ruleset;
+use crate::resources::variables::Variable;
 
 use super::prunable::Prunable;
 
@@ -78,6 +80,24 @@ pub struct Settings {
     /// Repository rulesets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rulesets: Option<Prunable<Ruleset>>,
+
+    /// Deployment environments and their protection rules.
+    ///
+    /// Environment-scoped Actions variables are declared inside each
+    /// environment, under `variables`.
+    ///
+    /// Note that inheritance replaces an environment whole: a file that extends
+    /// another and redeclares `production` merely to change its `wait_timer`
+    /// also replaces the inherited `variables` and `reviewers` lists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environments: Option<Prunable<Environment>>,
+
+    /// Repository-scoped Actions variables.
+    ///
+    /// Environment-scoped variables live under `environments[].variables`
+    /// instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variables: Option<Prunable<Variable>>,
 }
 
 impl Settings {
@@ -113,6 +133,8 @@ impl Settings {
             && self.labels.is_none()
             && self.autolinks.is_none()
             && self.rulesets.is_none()
+            && self.environments.is_none()
+            && self.variables.is_none()
     }
 
     /// Cross-section checks that no individual resource can perform.

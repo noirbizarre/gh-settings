@@ -137,6 +137,44 @@ fn every_collection_merges_by_its_own_identity() {
     assert_eq!(rulesets[0].rules[0].rule_type, "non_fast_forward");
 }
 
+#[test]
+fn environments_and_variables_merge_by_the_key_their_diff_uses() {
+    // GitHub matches environment names case-insensitively and variable names
+    // case-insensitively too, so a merge that disagreed with the diff would
+    // produce a plan that creates something which already exists.
+    let (settings, _, _) = merged(
+        "environments:\n  - name: staging\n    wait_timer: 5\nvariables:\n  - name: region\n    value: eu\n",
+        "environments:\n  - name: Staging\n    wait_timer: 10\nvariables:\n  - name: REGION\n    value: us\n",
+    );
+
+    let environments = settings.environments.as_ref().unwrap().items();
+    assert_eq!(environments.len(), 1, "same name, so one environment");
+    assert_eq!(environments[0].name, "Staging");
+    assert_eq!(environments[0].wait_timer, Some(10));
+
+    let variables = settings.variables.as_ref().unwrap().items();
+    assert_eq!(variables.len(), 1, "same name, so one variable");
+    assert_eq!(variables[0].value, "us");
+}
+
+#[test]
+fn a_redeclared_environment_replaces_its_nested_variables_whole() {
+    // Replace-by-identity, applied to a large item. Documented in ADR-017
+    // rather than special-cased: merging field by field would reintroduce the
+    // omitted-versus-defaulted ambiguity the whole design avoids.
+    let (settings, _, _) = merged(
+        "environments:\n  - name: staging\n    variables:\n      - name: A\n        value: inherited\n",
+        "environments:\n  - name: staging\n    wait_timer: 5\n",
+    );
+
+    let environments = settings.environments.as_ref().unwrap().items();
+    assert_eq!(environments[0].wait_timer, Some(5));
+    assert_eq!(
+        environments[0].variables, None,
+        "the child's item wins whole"
+    );
+}
+
 // --- pruning ----------------------------------------------------------------
 
 #[test]

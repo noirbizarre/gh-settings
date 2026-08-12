@@ -1,0 +1,15 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:4:17]
+ 2 | environments:
+ 3 |   - name: staging
+ 4 |     wait_timer: 50000
+   :                 ^^|^^
+   :                   `-- too long
+   `----
+  help: 43200 minutes is 30 days

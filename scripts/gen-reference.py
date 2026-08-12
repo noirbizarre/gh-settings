@@ -33,6 +33,10 @@ Add this line to get completion and validation in your editor:
 ```
 """
 
+# Deepest heading level the walk will emit, enough for
+# `environments.items[].variables[]`.
+MAX_LEVEL = 5
+
 
 def resolve(schema: dict[str, Any], root: dict[str, Any]) -> dict[str, Any]:
     """Follow a local `$ref`, merging any sibling keywords."""
@@ -254,6 +258,42 @@ def render_object(
     return lines
 
 
+def walk(
+    name: str,
+    schema: dict[str, Any],
+    root: dict[str, Any],
+    level: int,
+    seen: set[str],
+) -> list[str]:
+    """Render a section and every object type nested inside it."""
+    out = render_object(name, schema, root, level)
+
+    # Markdown headings below h5 stop being navigable, and the schema itself
+    # serves deeper nesting better than an unreadable table would. Nothing in
+    # the configuration reaches this depth today; the cap is here so that adding
+    # something that does fails visibly rather than silently truncating.
+    if level >= MAX_LEVEL:
+        return out
+
+    resolved = unwrap(schema, root)
+    for key, value in (resolved.get("properties") or {}).items():
+        nested = unwrap(value, root)
+        # The `seen` set keeps a self-referential type from recursing forever.
+        path = f"{name}.{key}"
+        if nested.get("properties") and path not in seen:
+            seen.add(path)
+            out.extend(walk(path, nested, root, level + 1, seen))
+
+        # A list of objects: document the element type.
+        items = unwrap(nested.get("items", {}), root) if nested.get("items") else {}
+        path = f"{name}.{key}[]"
+        if items.get("properties") and path not in seen:
+            seen.add(path)
+            out.extend(walk(path, items, root, level + 1, seen))
+
+    return out
+
+
 def main() -> int:
     schema = json.load(sys.stdin)
     root = schema
@@ -261,19 +301,7 @@ def main() -> int:
     out = [HEADER]
 
     for name, section in schema.get("properties", {}).items():
-        out.extend(render_object(name, section, root, level=2))
-
-        # Document nested object types one level deep; deeper nesting is better
-        # served by the schema itself than by an unreadable table.
-        resolved = unwrap(section, root)
-        for key, value in (resolved.get("properties") or {}).items():
-            nested = unwrap(value, root)
-            if nested.get("properties"):
-                out.extend(render_object(f"{name}.{key}", nested, root, level=3))
-            # A list of objects: document the element type.
-            items = unwrap(nested.get("items", {}), root) if nested.get("items") else {}
-            if items.get("properties"):
-                out.extend(render_object(f"{name}.{key}[]", items, root, level=3))
+        out.extend(walk(name, section, root, level=2, seen=set()))
 
     # Exactly one trailing newline. Emitting two would put this generator in a
     # fight with prek's end-of-file-fixer, and the "is the committed copy

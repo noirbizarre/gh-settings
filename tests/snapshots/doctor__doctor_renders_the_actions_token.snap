@@ -9,13 +9,15 @@ Environment
     Scopes           issues
 
 Resources
-  ✘ repository  requires Administration: write, which cannot be granted to GITHUB_TOKEN
-  ✘ topics      requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ repository    requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ topics        requires Administration: write, which cannot be granted to GITHUB_TOKEN
   ✔ labels
-  ✘ autolinks   requires Administration: write, which cannot be granted to GITHUB_TOKEN
-  ✘ rulesets    requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ autolinks     requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ rulesets      requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ environments  requires Administration: write, which cannot be granted to GITHUB_TOKEN
+  ✘ variables     requires Variables: write, which cannot be granted to GITHUB_TOKEN
 
-  ✘ extends     requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have
+  ✘ extends       requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have
 
 → Use a personal access token or a GitHub App installation token.
   See https://noirbizarre.github.io/gh-settings/authentication/

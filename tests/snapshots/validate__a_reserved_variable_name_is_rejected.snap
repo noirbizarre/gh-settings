@@ -1,0 +1,16 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:3:11]
+ 1 | version: 1
+ 2 | variables:
+ 3 |   - name: GITHUB_TOKEN
+   :           ^^^^^^|^^^^^
+   :                 `-- reserved prefix
+ 4 |     value: x
+   `----
+  help: GitHub reserves `GITHUB_*` for the variables it sets itself

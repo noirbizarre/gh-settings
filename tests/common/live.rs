@@ -124,6 +124,36 @@ impl Live {
             )));
         }
 
+        // Environments and variables carry deployment history and workflow
+        // configuration, so a repository holding either is not a sandbox.
+        let environments = self
+            .api(&["repos", &self.repo, "environments"])
+            .map_err(|error| refuse(format!("could not read environments: {error}")))?;
+        let count = serde_json::from_str::<serde_json::Value>(&environments)
+            .ok()
+            .and_then(|page| page.get("total_count").and_then(serde_json::Value::as_u64))
+            .unwrap_or(0);
+        if count > 0 {
+            return Err(refuse(format!(
+                "{} already has environments; refusing to touch it",
+                self.repo
+            )));
+        }
+
+        let variables = self
+            .api(&["repos", &self.repo, "actions", "variables"])
+            .map_err(|error| refuse(format!("could not read variables: {error}")))?;
+        let count = serde_json::from_str::<serde_json::Value>(&variables)
+            .ok()
+            .and_then(|page| page.get("total_count").and_then(serde_json::Value::as_u64))
+            .unwrap_or(0);
+        if count > 0 {
+            return Err(refuse(format!(
+                "{} already has Actions variables; refusing to touch it",
+                self.repo
+            )));
+        }
+
         // Labels are the one resource with defaults, so a repository is only
         // "clean" if every label it has is one GitHub created.
         let labels = self
@@ -232,7 +262,9 @@ impl Live {
              labels:\n  prune: true\n  items: []\n\
              topics:\n  prune: true\n  items: []\n\
              autolinks:\n  prune: true\n  items: []\n\
-             rulesets:\n  prune: true\n  items: []\n";
+             rulesets:\n  prune: true\n  items: []\n\
+             variables:\n  prune: true\n  items: []\n\
+             environments:\n  prune: true\n  items: []\n";
 
         self.config(purge);
         let output = self.run(&["sync", "--yes", "--prune"]);

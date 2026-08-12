@@ -1,0 +1,16 @@
+---
+source: tests/validate.rs
+expression: output.stderr
+---
+gh_settings::config::invalid
+
+  x configuration has 1 error
+   ,-[[CONFIG]:5:7]
+ 3 |   - name: staging
+ 4 |     deployment_branch_policy:
+ 5 |       branches: []
+   :       ^^^^^^|^^^^^^
+   :             `-- a custom deployment branch policy needs at least one pattern
+   `----
+  help: list `branches` or `tags`, use `protected`, or set the policy to
+        `null`

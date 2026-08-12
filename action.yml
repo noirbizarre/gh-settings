@@ -17,10 +17,11 @@ inputs:
 
       The default is the workflow's own GITHUB_TOKEN, which is enough for
       `validate` and for labels — and nothing else. Repository settings,
-      topics, autolinks and rulesets need `Administration: write`, which
-      the workflow `permissions:` block cannot grant at all, because it has
-      no `administration` key. For those, supply a personal access token or
-      a GitHub App installation token.
+      topics, autolinks, rulesets and environments need `Administration:
+      write`, and variables need `Variables: write`. The workflow
+      `permissions:` block cannot grant either, because it has no key for
+      them. For those, supply a personal access token or a GitHub App
+      installation token.
 
       Run this action with `command: doctor` to see what a token can manage.
       See https://noirbizarre.github.io/gh-settings/authentication/
@@ -195,7 +196,7 @@ runs:
         if [ "$status" -ne 0 ] && printf '%s' "$output" | jq -e \
             '[(.failures // [])[] | select(.status == 403 or .status == 401)] | length > 0' \
             >/dev/null 2>&1; then
-          echo "::error title=gh-settings::Some changes were refused for permission reasons. secrets.GITHUB_TOKEN cannot manage repository settings, topics, autolinks or rulesets — use a personal access token or a GitHub App token. Run this action with 'command: doctor' to see what your token can manage."
+          echo "::error title=gh-settings::Some changes were refused for permission reasons. secrets.GITHUB_TOKEN cannot manage repository settings, topics, autolinks, rulesets, environments or variables — use a personal access token or a GitHub App token. Run this action with 'command: doctor' to see what your token can manage."
         fi
 
         exit "$status"

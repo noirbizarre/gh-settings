@@ -56,7 +56,15 @@ fn every_resource_is_manageable_with_a_repo_scoped_token() {
     let runner = sandbox("ghp_x", Some("repo, read:org")).build();
     let output = runner.run(&["doctor", "-R", "o/r"]);
 
-    for resource in ["repository", "topics", "labels", "autolinks", "rulesets"] {
+    for resource in [
+        "repository",
+        "topics",
+        "labels",
+        "autolinks",
+        "rulesets",
+        "environments",
+        "variables",
+    ] {
         assert!(
             output.stdout.contains(resource),
             "{resource} missing from the table"
@@ -218,7 +226,7 @@ fn doctor_emits_json() {
     assert_eq!(value["authentication"]["account"], "tester");
 
     let resources = value["resources"].as_array().expect("resources");
-    assert_eq!(resources.len(), 5);
+    assert_eq!(resources.len(), 7);
     assert!(
         resources
             .iter()
