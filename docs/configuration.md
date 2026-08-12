@@ -20,10 +20,12 @@ Add this line to get completion and validation in your editor:
 
 Autolink references.
 
+May also be written as a bare list, which is the same as giving `items` with `prune: false`.
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `items` | list of object | no | The declared items. |
-| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. |
+| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
 
 
 ### `autolinks.items[]`
@@ -41,10 +43,14 @@ A single autolink reference.
 
 Inherit this configuration from another repository.
 
-Written as `owner/repo@ref`, optionally with a path:
-`acme/.github@v1` reads `.github/settings.yml` from the `acme/.github`
-repository at the `v1` ref. The ref is required, so a shared base cannot
-move underneath a plan that was reviewed against it.
+Written as `owner/repo[/path/to/file]@ref`. The path is optional and
+defaults to `.github/settings.yml`, so:
+
+- `acme/.github@v1` reads `.github/settings.yml` from `acme/.github`
+- `acme/.github/config/base.yml@v1` reads that file instead
+
+The ref is required, so a shared base cannot move underneath a plan that
+was reviewed against it.
 
 Anything the local file declares wins. Collections are merged by item
 identity — a label of the same name replaces the inherited one outright —
@@ -60,10 +66,12 @@ Type: string
 
 Issue and pull request labels.
 
+May also be written as a bare list, which is the same as giving `items` with `prune: false`.
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `items` | list of object | no | The declared items. |
-| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. |
+| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
 
 
 ### `labels.items[]`
@@ -72,7 +80,7 @@ A single label.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `color` | string | no | Six hexadecimal digits, with or without a leading `#`. |
+| `color` | string | no | Six hexadecimal digits, with or without a leading `#`. Defaults to `ededed`. |
 | `description` | string | no | Optional short description, at most 100 characters. |
 | `name` | string | yes | Label name. |
 | `new_name` | string | no | Rename this label to the given name. |
@@ -101,12 +109,12 @@ settings.
 | `has_wiki` | boolean | no | Whether the wiki is enabled. |
 | `homepage` | string | no | Project website shown next to the description. |
 | `is_template` | boolean | no | Whether the repository is a template. |
-| `merge_commit_message` | string | no | Default commit message for merge commits. |
-| `merge_commit_title` | string | no | Default commit title for merge commits. |
+| `merge_commit_message` | `PR_BODY` \| `PR_TITLE` \| `BLANK` | no | Default commit message for merge commits. |
+| `merge_commit_title` | `PR_TITLE` \| `MERGE_MESSAGE` | no | Default commit title for merge commits. |
 | `private` | boolean | no | Whether the repository is private. |
 | `security` | object | no | Security and analysis features. |
-| `squash_merge_commit_message` | string | no | Default commit message for squash merges. |
-| `squash_merge_commit_title` | string | no | Default commit title for squash merges. |
+| `squash_merge_commit_message` | `PR_BODY` \| `COMMIT_MESSAGES` \| `BLANK` | no | Default commit message for squash merges. |
+| `squash_merge_commit_title` | `PR_TITLE` \| `COMMIT_OR_PR_TITLE` | no | Default commit title for squash merges. |
 | `topics` | list of string | no | Topics. |
 
 
@@ -127,10 +135,12 @@ Security and analysis features.
 
 Repository rulesets.
 
+May also be written as a bare list, which is the same as giving `items` with `prune: false`.
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `items` | list of object | no | The declared items. |
-| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. |
+| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
 
 
 ### `rulesets.items[]`
@@ -141,10 +151,10 @@ A repository ruleset.
 |---|---|---|---|
 | `bypass_actors` | list of object | no | Who may bypass it. |
 | `conditions` | object | no | Which refs it applies to. |
-| `enforcement` | string | no | How strictly it is applied. |
+| `enforcement` | `disabled` \| `active` \| `evaluate` | no | How strictly it is applied. Defaults to `active`. |
 | `name` | string | yes | Ruleset name. |
 | `rules` | list of object | no | The rules themselves. |
-| `target` | string | no | What the ruleset applies to. |
+| `target` | `branch` \| `tag` \| `push` | no | What the ruleset applies to. Defaults to `branch`. |
 
 
 ## `topics`
@@ -154,10 +164,12 @@ Repository topics.
 Also accepted under `repository.topics` for `safe-settings`
 compatibility; declaring both is an error.
 
+May also be written as a bare list, which is the same as giving `items` with `prune: false`.
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `items` | list of string | no | The declared items. |
-| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. |
+| `prune` | boolean | no | Delete items that exist on GitHub but are absent here. Defaults to `false`. |
 
 
 ## `version`
