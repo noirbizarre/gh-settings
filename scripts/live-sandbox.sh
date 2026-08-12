@@ -63,7 +63,7 @@ if ((existed)); then
   echo "About to RESET $repo:"
   echo "  every ruleset, autolink, environment and Actions variable is deleted"
   echo "  every non-default label is deleted, topics are cleared"
-  echo "  GitHub Pages is disabled, description and homepage are cleared"
+  echo "  description and homepage are cleared, Pages disabled if it can be"
 else
   echo "About to CREATE $repo as a public repository."
 fi
@@ -107,29 +107,72 @@ if ! api "repos/$repo/git/ref/heads/gh-pages" >/dev/null 2>&1; then
   echo "created branch gh-pages"
 fi
 
+# `live_pages_enable_and_update` publishes from `gh-pages` `/docs`. Without that
+# directory the build never completes, and GitHub refuses to deactivate a site
+# while a build is outstanding — so an empty branch makes Pages undeletable for
+# ever, not just for a minute.
+if ! api "repos/$repo/contents/docs/index.html?ref=gh-pages" >/dev/null 2>&1; then
+  api "repos/$repo/contents/docs/index.html" \
+    --method PUT \
+    --field message="Seed the Pages source for the live suite" \
+    --field branch=gh-pages \
+    --field content="$(printf '<!doctype html><title>gh-settings live sandbox</title>' | base64 -w0)" \
+    >/dev/null
+  echo "seeded gh-pages:/docs/index.html"
+fi
+
 # --- Reset ------------------------------------------------------------------
 
 # Everything below must be idempotent: this runs against a repository in an
 # unknown state, which is the whole point.
+#
+# And everything below is best-effort. `set -e` is right for the sections
+# above — a sandbox that could not be created or seeded is not a sandbox — but
+# wrong here: a reset that stops at the first refusal reports failure *after*
+# most of the destruction, leaving you unable to tell what state you are in.
+# So each step warns and carries on, and the exit code is decided at the end.
+
+failures=()
+
+warn() {
+  failures+=("$1")
+  echo "warning: $1" >&2
+}
+
+# Run a destructive call, recording the failure instead of aborting.
+try() {
+  local what="$1"
+  shift
+  local output
+  if output="$("$@" 2>&1)"; then
+    return 0
+  fi
+  warn "$what: ${output//$'\n'/ }"
+  return 1
+}
 
 for id in $(api "repos/$repo/rulesets" --jq '.[].id' 2>/dev/null || true); do
-  api "repos/$repo/rulesets/$id" --method DELETE --silent
-  echo "deleted ruleset $id"
+  if try "deleting ruleset $id" gh api "repos/$repo/rulesets/$id" --method DELETE --silent; then
+    echo "deleted ruleset $id"
+  fi
 done
 
 for id in $(api "repos/$repo/autolinks" --jq '.[].id' 2>/dev/null || true); do
-  api "repos/$repo/autolinks/$id" --method DELETE --silent
-  echo "deleted autolink $id"
+  if try "deleting autolink $id" gh api "repos/$repo/autolinks/$id" --method DELETE --silent; then
+    echo "deleted autolink $id"
+  fi
 done
 
 for name in $(api "repos/$repo/environments" --jq '.environments[].name' 2>/dev/null || true); do
-  api "repos/$repo/environments/$name" --method DELETE --silent
-  echo "deleted environment $name"
+  if try "deleting environment $name" gh api "repos/$repo/environments/$name" --method DELETE --silent; then
+    echo "deleted environment $name"
+  fi
 done
 
 for name in $(api "repos/$repo/actions/variables" --jq '.variables[].name' 2>/dev/null || true); do
-  api "repos/$repo/actions/variables/$name" --method DELETE --silent
-  echo "deleted variable $name"
+  if try "deleting variable $name" gh api "repos/$repo/actions/variables/$name" --method DELETE --silent; then
+    echo "deleted variable $name"
+  fi
 done
 
 # Labels are the one resource GitHub creates for you, so "clean" means "only
@@ -151,28 +194,53 @@ while IFS= read -r name; do
     continue
   fi
   # A label name may contain spaces, and `gh api` does not encode the path.
-  api "repos/$repo/labels/${name// /%20}" --method DELETE --silent
-  echo "deleted label $name"
+  if try "deleting label $name" gh api "repos/$repo/labels/${name// /%20}" --method DELETE --silent; then
+    echo "deleted label $name"
+  fi
 done < <(api "repos/$repo/labels" --jq '.[].name' 2>/dev/null || true)
 
 topics="$(api "repos/$repo/topics" --jq '.names | length' 2>/dev/null || echo 0)"
 if [[ $topics != 0 ]]; then
-  api "repos/$repo/topics" --method PUT --input - --silent <<<'{"names":[]}'
-  echo "cleared topics"
+  if try "clearing topics" gh api "repos/$repo/topics" --method PUT --input - --silent \
+    <<<'{"names":[]}'; then
+    echo "cleared topics"
+  fi
 fi
 
-# Pages and the repository fields are not covered by `Live::cleanup()`, and the
-# pre-flight cannot see them, so residue from `live_pages_enable_and_update` or
-# `live_repository_security_travels_in_its_own_request` would survive for ever.
-if api "repos/$repo/pages" >/dev/null 2>&1; then
-  api "repos/$repo/pages" --method DELETE --silent
-  echo "disabled Pages"
+# The live suite clears Pages and the repository fields itself, but a run killed
+# outright leaves them, and the pre-flight cannot see either.
+#
+# Pages is the awkward one. On a public repository GitHub ties the site to the
+# `gh-pages` branch and answers `422 Deactivating GitHub pages for this
+# repository is not allowed` for as long as that branch exists — verified by
+# deleting the branch, at which point the site vanished on its own. Since the
+# sandbox needs that branch for `live_pages_enable_and_update`, a site here is
+# not residue to be cleaned; it is the sandbox working as intended.
+if api "repos/$repo/git/ref/heads/gh-pages" >/dev/null 2>&1; then
+  if api "repos/$repo/pages" >/dev/null 2>&1; then
+    echo "left Pages enabled: it cannot be disabled while gh-pages exists"
+  fi
+elif api "repos/$repo/pages" >/dev/null 2>&1; then
+  if try "disabling Pages" gh api "repos/$repo/pages" --method DELETE --silent; then
+    echo "disabled Pages"
+  fi
 fi
 
-api "repos/$repo" --method PATCH --field description= --field homepage= --silent
-echo "cleared description and homepage"
+if try "clearing description and homepage" \
+  gh api "repos/$repo" --method PATCH --field description= --field homepage= --silent; then
+  echo "cleared description and homepage"
+fi
 
 # --- Done -------------------------------------------------------------------
+
+if ((${#failures[@]})); then
+  echo >&2
+  echo "${#failures[@]} step(s) did not succeed:" >&2
+  printf '  %s\n' "${failures[@]}" >&2
+  echo >&2
+  echo "Everything else was reset. Re-running is safe and usually enough." >&2
+  exit 1
+fi
 
 cat <<EOF
 
