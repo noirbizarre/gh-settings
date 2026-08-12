@@ -4,6 +4,80 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/noirbizarre/gh-settings/compare/0.1.0..0.2.0) - 2026-08-12
+
+### 💫 Features
+
+- **action** Add a composite action - ([1bdacb7](https://github.com/noirbizarre/gh-settings/commit/1bdacb79996d9f242a3ea7981094a940a3ef6ddf))
+- **config** Resolve and merge an inherited configuration - ([b667076](https://github.com/noirbizarre/gh-settings/commit/b667076f80b2d4edf5e304df43fb6ee1426361f8))
+- **config** Add the extends key, its reference syntax and its validation - ([3aef957](https://github.com/noirbizarre/gh-settings/commit/3aef9575a715d5e2a6240872e620249d64e2ee77))
+- **config** Merge an inherited configuration with the one extending it - ([c6fba48](https://github.com/noirbizarre/gh-settings/commit/c6fba4880101438cfed06fb3cbe37e3e41cfd6ff))
+- **doctor** Say when a token cannot read an inherited configuration - ([9fab2c7](https://github.com/noirbizarre/gh-settings/commit/9fab2c7786ce6f64e1cd67b0a660b09d0b871bb2))
+- **engine** Record inherited configurations in a saved plan - ([2f4be39](https://github.com/noirbizarre/gh-settings/commit/2f4be39c83666a776263e0263732fd111fd760b2))
+- **environments** Manage environments and Actions variables - ([daaa84e](https://github.com/noirbizarre/gh-settings/commit/daaa84e508deae166b6a0366710e9a409c5cc260))
+- **github** Resolve a user login to its identifier - ([4df5daf](https://github.com/noirbizarre/gh-settings/commit/4df5dafebdd202e937d00b43d0f80f379328b9a7))
+- **github** Read a file verbatim, and load a base configuration with it - ([3c8dfce](https://github.com/noirbizarre/gh-settings/commit/3c8dfce100b2af82f91441ae32fae14ade662fd9))
+- **json** Name the document each finding's offset belongs to - ([d5db3e1](https://github.com/noirbizarre/gh-settings/commit/d5db3e16b19d0e339c1ce2aed2d2553398541643))
+- **pages** Manage GitHub Pages - ([4a5607b](https://github.com/noirbizarre/gh-settings/commit/4a5607b621175bff666a80bedeef54c4e751e260))
+- **sync** Refuse to start when a change is certain to be rejected - ([75d2564](https://github.com/noirbizarre/gh-settings/commit/75d256484374f86b67055a4e1c12cc1b4268c566))
+- **sync** Name the missing permission when a write is refused - ([b2e966a](https://github.com/noirbizarre/gh-settings/commit/b2e966a9dc0fd560e7694226e7e2eef3ae7e6f78))
+
+### 🐛 Bug Fixes
+
+- **action** Point at a ref that exists, and make v1 exist - ([59d5fc5](https://github.com/noirbizarre/gh-settings/commit/59d5fc586e6a82d5411affbd52e60356f0007f97))
+- **action** Stop passing --prune to commands that reject it - ([44eaf77](https://github.com/noirbizarre/gh-settings/commit/44eaf773042d4d85f9680d0ce43816df7899018b))
+- **cli** Make `--format json` actually machine-readable - ([a0f4e3a](https://github.com/noirbizarre/gh-settings/commit/a0f4e3ac1c84d9fb2faf042ed400a30f0c9ca09b))
+- **doctor** Document the one permission that belongs to no resource - ([2398d28](https://github.com/noirbizarre/gh-settings/commit/2398d2823682082425fa7afe68796714e77860db))
+- **doctor** Report the inheritance verdict to machines too - ([df292b5](https://github.com/noirbizarre/gh-settings/commit/df292b55c013a3c9e3676f179c6ae5858a3c61bb))
+- **live** Finish the sandbox reset instead of stopping at the first refusal - ([fb17fde](https://github.com/noirbizarre/gh-settings/commit/fb17fdeda24b53f7b8e5aba20cb31f193dcc6a30))
+- **repository** Normalise what is read, and stop ignoring a published field - ([840c301](https://github.com/noirbizarre/gh-settings/commit/840c3010f593bd82c679b7617e507ea357d68b76))
+- **resources** Pages writes also require Administration: write - ([ceec0c0](https://github.com/noirbizarre/gh-settings/commit/ceec0c0facfe1a163946e2a6bb19c1cbaa7f8e37))
+- **resources** Correct the fine-grained permission mappings - ([9fa8203](https://github.com/noirbizarre/gh-settings/commit/9fa820380a3567a555e147067e73c485e741a2ca))
+- **rulesets** Make an organisation-admin bypass survive a round trip - ([734a64b](https://github.com/noirbizarre/gh-settings/commit/734a64b0d2bfc1d78bce7617ff9f8960f39a2ed8))
+- **rulesets** Underline the rule the user wrote, not the one that sorted there - ([1e62c2e](https://github.com/noirbizarre/gh-settings/commit/1e62c2e89fe0466a8243d0a7a8aa3b76e9b4e14a))
+- **tests** Derive the live doctor resource count from the registry - ([ee551fa](https://github.com/noirbizarre/gh-settings/commit/ee551fa926a9aa92ede3a0b8b6ecdbf4a0fade15))
+- **topics** Stop panicking on a configuration that only uses repository.topics - ([7fe71f0](https://github.com/noirbizarre/gh-settings/commit/7fe71f07a6dd4f0db7b13546e387d2d61ab31c56))
+- **validate** Stop demanding a repository nobody asked about - ([5eccdf9](https://github.com/noirbizarre/gh-settings/commit/5eccdf9448625241d68f795d61997f37449507ec))
+- **validate** Point at the item, not the whole section, in the object form - ([633b0fb](https://github.com/noirbizarre/gh-settings/commit/633b0fbe15cec3a1c72be817407d41d5731484fe))
+
+### 🔨 Refactor
+
+- **config** Record where each path lives instead of probing for it - ([8293ae4](https://github.com/noirbizarre/gh-settings/commit/8293ae49e7e4a9289b764e76f9ff92e4b43faebe))
+- **config** Carry every contributing document on Config - ([9be2719](https://github.com/noirbizarre/gh-settings/commit/9be2719077cf98769e7f9b56af28e4e8635eb46e))
+- **config** Tag spans with their document and split exact from resolve - ([31c88b7](https://github.com/noirbizarre/gh-settings/commit/31c88b7fd70d48d16763b82290e74ef1b2e96bef))
+- **config** Introduce Sources and SourceId - ([14e6d28](https://github.com/noirbizarre/gh-settings/commit/14e6d287f9274ffef280142eeb5dae3d4c677a5b))
+- **diagnostics** Render each finding against its own document - ([862a7c8](https://github.com/noirbizarre/gh-settings/commit/862a7c814027f605a2ed743fb9d70fa8a13bfebe))
+- **github** Share the path-segment encoder - ([d98d711](https://github.com/noirbizarre/gh-settings/commit/d98d7113dad06c8d76dfe62793f48926e890d8d6))
+- **github** Use the Resolver instead of duplicating it - ([54e4655](https://github.com/noirbizarre/gh-settings/commit/54e4655062f90d55ac80838a51a28ea6b3d3f366))
+- **resources** Make Requirement::verdict the one place a token is judged - ([ad88b68](https://github.com/noirbizarre/gh-settings/commit/ad88b68a9ac77efab3a37a435ddcfaaec2ebcc07))
+- Remove dead code and share the prune flags - ([7b134db](https://github.com/noirbizarre/gh-settings/commit/7b134db6cdba93cf72dccbdfe8f89b736e049e91))
+
+### 📚 Documentation
+
+- **logo** Add a wordmark, and generate the artwork from its sources - ([73b0b54](https://github.com/noirbizarre/gh-settings/commit/73b0b54bbe93066a9623c0cbda8cebc2dc568a3d))
+- Reconcile the claims that no longer match the code - ([19d850a](https://github.com/noirbizarre/gh-settings/commit/19d850af3e3d51d7abb5c3b8881e0461d4fe3e6c))
+- Render enum values, defaults and the bare-list section form - ([9a8d23a](https://github.com/noirbizarre/gh-settings/commit/9a8d23a272925bf84765cb4f32207c9c08d371b6))
+- Record diagnostic provenance (ADR-016) - ([8961bb6](https://github.com/noirbizarre/gh-settings/commit/8961bb6a88b4a16bef2ffa0d1f5858024fbe6175))
+- Describe the pre-flight check and tick off what shipped - ([47f1a43](https://github.com/noirbizarre/gh-settings/commit/47f1a43cd7bf7b734a6e8e795c324ec4fdd71ee1))
+
+### 🧪 Tests
+
+- **live** Stop the suite failing fast - ([67f2a27](https://github.com/noirbizarre/gh-settings/commit/67f2a27f065ccac7d51a4b35be1fca8555548144))
+- **live** Clean up from a destructor, not from the happy path - ([f819bcb](https://github.com/noirbizarre/gh-settings/commit/f819bcb88394806b0c1b48162687a11cc00f5921))
+- **live** Ask GitHub which permissions each endpoint requires - ([8526d33](https://github.com/noirbizarre/gh-settings/commit/8526d3397ab7f383af1b18cb04587d21e2908f9d))
+- **live** Provision sandboxes instead of sharing one - ([c19401a](https://github.com/noirbizarre/gh-settings/commit/c19401ad2effe70d6bf8e40159daff62406ed814))
+- **live** Run the real thing against a real repository - ([679b826](https://github.com/noirbizarre/gh-settings/commit/679b8266c01a21fa1066aacd52599a1b7349fa50))
+- **rulesets** Cover the apply path through the stub - ([05ea09a](https://github.com/noirbizarre/gh-settings/commit/05ea09aed379f9cdeff54ec1a52be89c37905b30))
+- **sync** Exercise --continue-on-error through the binary - ([885f29b](https://github.com/noirbizarre/gh-settings/commit/885f29b22d98e8b909e8f78ef657e869901a3a9d))
+- Snapshot the output of plan, doctor and export - ([e1f0fdc](https://github.com/noirbizarre/gh-settings/commit/e1f0fdc19f4afe51b839a23d195ea55c239e5058))
+
+### 🔧 CI
+
+- **hooks** Drop the trailing blank line in the logo script - ([aedc83f](https://github.com/noirbizarre/gh-settings/commit/aedc83f7c877bd2817a083aed8c125811939a545))
+- **live** Run the live suite on every code change to main - ([7ece915](https://github.com/noirbizarre/gh-settings/commit/7ece915a90f6f985f565988cdc14d12989c06ea5))
+- **release** Check the asset suffix, not how the tag is spelled - ([2c64b8e](https://github.com/noirbizarre/gh-settings/commit/2c64b8e5fa27f6e7dbe9a140c3a32e787cdb1233))
+- **release** Pass the release tag through env: rather than interpolating it - ([ce071ab](https://github.com/noirbizarre/gh-settings/commit/ce071abaf3ec17e96e14a5d48193613bd67f6d83))
+
 ## 0.1.0 - 2026-08-03
 
 ### 💫 Features
@@ -47,4 +121,4 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## ❤️ New Contributors
 
-* @noirbizarre made their first contribution
+* @noirbizarre made their first contribution in [#2](https://github.com/noirbizarre/gh-settings/pull/2)
