@@ -36,8 +36,9 @@ statuses, pages
 **There is no `administration` key.** It cannot be requested at any value.
 
 Repository metadata, topics, autolinks, rulesets and environments all require
-`Administration: write`, and Actions variables require `Variables: write`.
-Neither key exists in that list, so they are *structurally* unavailable to
+`Administration: write`; Actions variables require `Variables: write`, and the
+ones nested under an environment require `Environments: write`. None of those
+keys exists in the list above, so they are *structurally* unavailable to
 `GITHUB_TOKEN` — this is not a permission you forgot to enable, it cannot be
 granted at all.
 
@@ -120,9 +121,17 @@ The App needs the repository permissions listed below.
 | **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets`, `environments` |
 | **Issues** | Read & write | `labels` |
 | **Pages** | Read & write | `pages` |
-| **Variables** | Read & write | `variables`, including the ones nested under an environment |
+| **Variables** | Read & write | `variables` at repository scope |
+| **Environments** | Read & write | `variables` nested under an environment; reading them back on `export` |
+| **Actions** | Read | Listing the repository's environments, which both `environments` and `variables` start from |
 | **Contents** | Read | Reading a base named in `extends:` — **on that repository**, not this one |
 | *Organization → Members* | Read | Resolving `bypass_actors: [{ team: … }]` and environment reviewers named by team (organisation repositories only) |
+
+These categories do **not** nest ([ADR-020](adr/020-permission-categories-do-not-nest.md)).
+`Administration: write` lets you create an environment but not *list* the
+environments — that read is `Actions: read` — and it does not cover an
+environment's variables either. A token granted only what it seems to need will
+fail on the read before it ever attempts the write.
 
 Fine-grained tokens do not report their permissions through the API. `doctor`
 will therefore say **unknown** rather than guessing, and fall back to probing
@@ -158,12 +167,12 @@ actually enforces.
 | `labels` | Metadata: read, Issues: write | `repo` | ✔ |
 | `autolinks` | Metadata: read, Administration: write | `repo` | ✘ |
 | `rulesets` | Metadata: read, Administration: write | `repo` | ✘ |
-| `environments` | Metadata: read, Administration: write | `repo` | ✘ |
-| `variables` | Metadata: read, Variables: write † | `repo` | ✘ |
-| `pages` | Metadata: read, Pages: write | `repo` | ✔ |
+| `environments` | Metadata: read, Actions: read, Environments: read, Administration: write | `repo` | ✘ |
+| `variables` | Metadata: read, Actions: read, Variables: write, Environments: write | `repo` | ✘ |
+| `pages` | Metadata: read, Pages: write † | `repo` | ✔ |
 | `extends` | Contents: read | `repo` | ✘ |
 
-† This mapping is inferred rather than confirmed against GitHub's own reference. It is our best understanding, not a guarantee; `gh settings doctor` will tell you what your token can actually do.
+† GitHub's own reference does not settle this mapping — it is either absent or ambiguous there, so this is our best understanding and the minimal claim, not a guarantee. `gh settings doctor` will tell you what your token can actually do.
 
 `repository`, `topics`, `autolinks`, `rulesets` and `environments` require Administration: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
 
@@ -243,6 +252,11 @@ message names the resource and the missing permission; grant it and re-run.
 **`HTTP 403` with a personal access token**
 Your token is missing `repo` (classic) or `Administration: write`
 (fine-grained). The error names the permission for the resource that failed.
+
+**`HTTP 403` or `404` while *reading* environments or variables**
+Not the write permission — the read. Listing environments is `Actions: read`,
+and an environment's variables are `Environments`, neither of which
+`Administration: write` includes. See the table above.
 
 **`HTTP 404` on a repository you can see in the browser**
 A fine-grained token only covers repositories it was explicitly granted. Check

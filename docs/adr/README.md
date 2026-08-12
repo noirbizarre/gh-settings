@@ -20,8 +20,9 @@ supersedes it, rather than a rewrite of history.
 | [012](012-testing-strategy.md) | Testing through a `gh` process stub and request-log assertions | Accepted, extended by 019 |
 | [013](013-single-crate.md) | Single crate until a second consumer exists | Accepted |
 | [014](014-releases.md) | Releases are orchestrated by gh-ship | Accepted |
-| [015](015-token-requirements.md) | Token requirements are declared per resource | Accepted |
+| [015](015-token-requirements.md) | Token requirements are declared per resource | Accepted, extended by 020 |
 | [016](016-diagnostic-provenance.md) | Diagnostics carry the identity of the document they came from | Accepted |
 | [017](017-inheritance.md) | Inheritance replaces whole items, and provenance follows the merge | Accepted |
 | [018](018-resources-may-span-sections.md) | A resource may span more than one configuration section | Accepted |
 | [019](019-live-test-sandboxes.md) | Live-test sandboxes are owned, not created per run | Accepted |
+| [020](020-permission-categories-do-not-nest.md) | Fine-grained permission categories do not nest | Accepted |

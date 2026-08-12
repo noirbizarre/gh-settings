@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted, extended by [020](020-permission-categories-do-not-nest.md).
 
 ## Context
 

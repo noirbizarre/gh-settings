@@ -95,7 +95,7 @@ impl Resource for Environments {
     }
 
     fn requirement(&self) -> &'static Requirement {
-        &Requirement::ADMINISTRATION
+        &Requirement::ENVIRONMENTS
     }
 
     fn desired(&self, settings: &Settings) -> Option<Self::Desired> {

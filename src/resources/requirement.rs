@@ -125,28 +125,69 @@ impl Requirement {
 
     /// Actions variables, at repository and at environment scope.
     ///
-    /// The fine-grained permission is spelled `Variables` in the token UI, and
-    /// it is separate from `Actions` — a token that can rerun workflows cannot
-    /// necessarily write variables.
+    /// Four permissions, because the two scopes are not the same permission and
+    /// neither of them lets us find the environments in the first place:
     ///
-    /// Marked unverified: GitHub's reference has described the *environment*-
-    /// scoped endpoints as sitting under `Actions: write` in places, and we
-    /// could not confirm from first-party documentation which is authoritative.
-    /// Per ADR-015 that is reported as uncertainty rather than asserted.
+    /// * `/repos/{o}/{r}/actions/variables` is **Variables**;
+    /// * `/repos/{o}/{r}/environments/{name}/variables` is **Environments** —
+    ///   the scope, not the payload, decides;
+    /// * `GET /repos/{o}/{r}/environments`, which we call to discover the
+    ///   environment scopes at all, is **Actions: read**.
+    ///
+    /// The earlier note here guessed that the environment-scoped endpoints sat
+    /// under `Actions: write`. They do not; the reference lists them under
+    /// Environments, and the `Actions` entry is read-only and for a different
+    /// request. See ADR-020: these categories do not nest.
     ///
     /// This is not the secrets exclusion of ADR-009: variable values are
     /// readable, so they diff, export and round-trip like anything else.
     pub const VARIABLES: Requirement = Requirement {
         fine_grained: &[
             FineGrained::documented("Metadata", Access::Read),
-            FineGrained::unverified("Variables", Access::Write),
+            FineGrained::documented("Actions", Access::Read),
+            FineGrained::documented("Variables", Access::Write),
+            FineGrained::documented("Environments", Access::Write),
         ],
         classic: &["repo"],
         // The workflow `permissions:` block has no `variables` key, so this is
         // not a grant somebody forgot to make — it is one that cannot be made.
+        // The same is true of `environments`; naming one suffices to explain
+        // the refusal, and naming both would say the same thing twice.
         github_token_capable: false,
         github_token_note: Some(
             "requires Variables: write, which cannot be granted to GITHUB_TOKEN",
+        ),
+    };
+
+    /// Deployment environments.
+    ///
+    /// Cannot share [`Self::ADMINISTRATION`], because managing an environment
+    /// is spread across three permissions that do not contain one another:
+    ///
+    /// * `PUT`/`DELETE /repos/{o}/{r}/environments/{name}` and the deployment
+    ///   branch policies are **Administration: write**;
+    /// * `GET /repos/{o}/{r}/environments` — the read every plan starts with —
+    ///   is **Actions: read**;
+    /// * `GET .../environments/{name}/variables`, which `export` emits under
+    ///   this section (ADR-018), is **Environments: read**.
+    ///
+    /// So a token holding `Administration: write` and nothing else cannot even
+    /// *list* the environments it is allowed to write. That is the kind of
+    /// surprise this declaration exists to spell out (ADR-020).
+    pub const ENVIRONMENTS: Requirement = Requirement {
+        fine_grained: &[
+            FineGrained::documented("Metadata", Access::Read),
+            FineGrained::documented("Actions", Access::Read),
+            FineGrained::documented("Environments", Access::Read),
+            FineGrained::documented("Administration", Access::Write),
+        ],
+        classic: &["repo"],
+        github_token_capable: false,
+        // Byte-identical to ADMINISTRATION's on purpose: the docs generator
+        // groups resources by this string, and a paraphrase would split the
+        // sentence in two.
+        github_token_note: Some(
+            "requires Administration: write, which cannot be granted to GITHUB_TOKEN",
         ),
     };
 
@@ -155,10 +196,32 @@ impl Requirement {
     /// The odd one out among the repository-level settings: `pages` *is* a key
     /// in the workflow `permissions:` block, so unlike `administration` and
     /// `variables` this is a grant an Actions workflow can actually make.
+    /// `actions/configure-pages` enables a site with `pages: write` and nothing
+    /// else, which is why `github_token_capable` is asserted rather than
+    /// hedged.
+    ///
+    /// The *fine-grained* mapping is the uncertain one. GitHub's reference
+    /// lists `POST`, `PUT` and `DELETE /repos/{o}/{r}/pages` under **both**
+    /// `Pages: write` and `Administration: write`, with the marker that means
+    /// either "needs more than one of these" or "needs any one of these" —
+    /// without saying which. `Pages: write` alone is therefore our best
+    /// understanding and the minimal claim, but it is not confirmed, so it is
+    /// marked as such rather than asserted (ADR-015).
+    ///
+    /// To settle it, send a request with a deliberately invalid body using a
+    /// **fine-grained** token and read `X-Accepted-GitHub-Permissions`, which
+    /// spells "and" as `;` and "or" as `,`:
+    ///
+    /// ```sh
+    /// gh api -i -X PUT repos/OWNER/REPO/pages -f build_type=nonsense | grep -i x-accepted
+    /// ```
+    ///
+    /// The header is only emitted for fine-grained tokens — a classic PAT gets
+    /// `X-Accepted-OAuth-Scopes` instead, which answers a different question.
     pub const PAGES: Requirement = Requirement {
         fine_grained: &[
             FineGrained::documented("Metadata", Access::Read),
-            FineGrained::documented("Pages", Access::Write),
+            FineGrained::unverified("Pages", Access::Write),
         ],
         classic: &["repo"],
         github_token_capable: true,
@@ -330,6 +393,7 @@ mod tests {
             &Requirement::ADMINISTRATION,
             &Requirement::ISSUES,
             &Requirement::VARIABLES,
+            &Requirement::ENVIRONMENTS,
             &Requirement::PAGES,
         ] {
             assert!(
@@ -340,6 +404,55 @@ mod tests {
                 "missing Metadata: read"
             );
         }
+    }
+
+    /// Assert a requirement carries exactly this permission at this level.
+    fn demands(requirement: &Requirement, name: &str, access: Access) -> bool {
+        requirement
+            .fine_grained
+            .iter()
+            .any(|p| p.name == name && p.access == access)
+    }
+
+    #[test]
+    fn environment_scoped_variables_need_the_environments_permission() {
+        // The scope decides the permission, not the payload:
+        // `actions/variables` is Variables, `environments/{name}/variables` is
+        // Environments. Declaring only the former was wrong (ADR-020).
+        assert!(demands(&Requirement::VARIABLES, "Variables", Access::Write));
+        assert!(demands(
+            &Requirement::VARIABLES,
+            "Environments",
+            Access::Write
+        ));
+    }
+
+    #[test]
+    fn listing_environments_needs_actions_read() {
+        // `GET /repos/{o}/{r}/environments` sits under Actions, and both
+        // resources that manage environments start from it. Administration:
+        // write does not include it — these categories do not nest.
+        assert!(demands(&Requirement::ENVIRONMENTS, "Actions", Access::Read));
+        assert!(demands(&Requirement::VARIABLES, "Actions", Access::Read));
+    }
+
+    #[test]
+    fn environments_cannot_be_written_without_administration() {
+        assert!(demands(
+            &Requirement::ENVIRONMENTS,
+            "Administration",
+            Access::Write
+        ));
+    }
+
+    #[test]
+    fn environments_repeats_the_administration_note_verbatim() {
+        // The docs generator groups resources into one sentence by exact string
+        // equality, so a paraphrase here silently splits the paragraph in two.
+        assert_eq!(
+            Requirement::ENVIRONMENTS.github_token_note,
+            Requirement::ADMINISTRATION.github_token_note
+        );
     }
 
     #[test]
@@ -363,6 +476,30 @@ mod tests {
         };
         assert!(requirement.has_unverified());
         assert!(!Requirement::ISSUES.has_unverified());
+    }
+
+    #[test]
+    fn pages_is_the_only_mapping_still_unconfirmed() {
+        // GitHub lists the Pages writes under both Pages: write and
+        // Administration: write, with a marker that means either "both" or
+        // "either" without saying which. We declare the minimal claim and admit
+        // it (ADR-015). Everything else is settled, so this test is also the
+        // reminder to delete the footnote once a fine-grained token has read
+        // `X-Accepted-GitHub-Permissions` for `PUT /repos/{o}/{r}/pages`.
+        assert!(Requirement::PAGES.has_unverified());
+        for requirement in [
+            &Requirement::ADMINISTRATION,
+            &Requirement::ISSUES,
+            &Requirement::VARIABLES,
+            &Requirement::ENVIRONMENTS,
+            &Requirement::CONTENTS,
+        ] {
+            assert!(
+                !requirement.has_unverified(),
+                "{} should be settled against the reference",
+                requirement.fine_grained_summary()
+            );
+        }
     }
 
     mod verdict {

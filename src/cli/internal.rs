@@ -129,8 +129,9 @@ pub fn requirements() -> String {
         let _ = writeln!(out);
         let _ = writeln!(
             out,
-            "† This mapping is inferred rather than confirmed against GitHub's own \
-             reference. It is our best understanding, not a guarantee; \
+            "† GitHub's own reference does not settle this mapping — it is \
+             either absent or ambiguous there, so this is our best \
+             understanding and the minimal claim, not a guarantee. \
              `gh settings doctor` will tell you what your token can actually do."
         );
     }
