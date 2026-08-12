@@ -18,7 +18,9 @@ use serde_json::{Value, json};
 
 use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
-use crate::github::{GitHubClient, GitHubClientExt, Request, Result as GitHubResult, Target};
+use crate::github::{
+    GitHubClient, GitHubClientExt, Request, Result as GitHubResult, Target, urlencode,
+};
 use crate::resources::{Change, Op, PruneOpts, Requirement, Resource, ResourceId, ValidateCtx};
 
 pub mod model;
@@ -253,22 +255,6 @@ impl Resource for Labels {
                 .collect(),
         )))
     }
-}
-
-/// Percent-encode a label name for use in a path segment.
-///
-/// Label names routinely contain spaces (`good first issue`) and `/`
-/// (`area/docs`), both of which would otherwise corrupt the endpoint.
-fn urlencode(value: &str) -> String {
-    value
-        .bytes()
-        .map(|byte| match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                (byte as char).to_string()
-            }
-            _ => format!("%{byte:02X}"),
-        })
-        .collect()
 }
 
 #[cfg(test)]

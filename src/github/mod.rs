@@ -202,9 +202,37 @@ impl fmt::Display for Method {
 /// Convenient result alias for this layer.
 pub type Result<T> = std::result::Result<T, GitHubError>;
 
+/// Percent-encode a value for use as a single path segment.
+///
+/// Several GitHub resources are addressed by a user-chosen name rather than by
+/// an identifier, and those names routinely contain characters that would
+/// otherwise corrupt the endpoint: label names carry spaces (`good first
+/// issue`) and `/` (`area/docs`), and environment names accept both too.
+///
+/// Only the RFC 3986 unreserved set is left alone, `/` included — a name is one
+/// segment, never a path.
+pub fn urlencode(value: &str) -> String {
+    value
+        .bytes()
+        .map(|byte| match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (byte as char).to_string()
+            }
+            _ => format!("%{byte:02X}"),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn urlencoding_escapes_everything_outside_the_unreserved_set() {
+        assert_eq!(urlencode("good first issue"), "good%20first%20issue");
+        assert_eq!(urlencode("area/docs"), "area%2Fdocs");
+        assert_eq!(urlencode("a-b_c.d~e9"), "a-b_c.d~e9");
+    }
 
     #[test]
     fn only_get_is_a_read() {
