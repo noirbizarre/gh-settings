@@ -125,6 +125,11 @@ That is the safety check working, not a bug. `mise run test:live:setup --yes`
 resets the sandbox — it goes wider than the tests' own cleanup, which does not
 cover Pages or the repository fields.
 
+One test, `live_declared_permissions_match_what_github_accepts`, asks GitHub
+what permissions each endpoint really requires and checks our declarations
+against the answer. GitHub only answers fine-grained tokens, so it prints a skip
+and passes on anything else. A skip there is expected, not a broken suite.
+
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/), enforced by

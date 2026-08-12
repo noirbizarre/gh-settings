@@ -239,7 +239,7 @@ impl Live {
     }
 
     /// Call `gh api` directly, for setup and teardown.
-    fn api(&self, path: &[&str]) -> Result<String, String> {
+    pub fn api(&self, path: &[&str]) -> Result<String, String> {
         let output = Command::new("gh")
             .arg("api")
             .arg(path.join("/"))
@@ -251,6 +251,55 @@ impl Live {
         } else {
             Err(String::from_utf8_lossy(&output.stderr).into_owned())
         }
+    }
+
+    /// Whether the credential is a fine-grained personal access token.
+    ///
+    /// The only kind GitHub answers permission questions for: a classic token
+    /// is told its OAuth scopes instead, which is a different question with a
+    /// different answer.
+    pub fn credential_is_fine_grained(&self) -> bool {
+        Command::new("gh")
+            .args(["auth", "token"])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .trim()
+                    .starts_with("github_pat_")
+            })
+            .unwrap_or(false)
+    }
+
+    /// What GitHub says an endpoint requires, from `X-Accepted-GitHub-Permissions`.
+    ///
+    /// Returns `None` when the header is absent — which is what a classic token
+    /// always gets, so callers must establish [`Self::credential_is_fine_grained`]
+    /// first or they will read "no answer" as "no permissions needed".
+    ///
+    /// The exit status is deliberately ignored: the informative probes are the
+    /// ones GitHub rejects, and it sets this header on failures too. That is
+    /// the point — it exists to tell you what you *should* have asked for.
+    pub fn accepted_permissions(&self, method: &str, path: &str, body: &[&str]) -> Option<String> {
+        let output = Command::new("gh")
+            .args(["api", "-i", "--method", method, path])
+            .args(body)
+            .output()
+            .ok()?;
+
+        // `-i` prints the response head to stdout; errors still go to stderr.
+        let head = String::from_utf8_lossy(&output.stdout).into_owned()
+            + &String::from_utf8_lossy(&output.stderr);
+
+        head.lines()
+            .find(|line| {
+                line.to_ascii_lowercase()
+                    .starts_with("x-accepted-github-permissions:")
+            })
+            .and_then(|line| line.split_once(':'))
+            .map(|(_, value)| value.trim().to_string())
+            .filter(|value| !value.is_empty())
     }
 
     /// Remove everything the suite may have created.

@@ -55,3 +55,8 @@ currently the only one.
   `X-Accepted-GitHub-Permissions` response header, which spells "and" as `;`
   and "or" as `,`. A classic token gets `X-Accepted-OAuth-Scopes` instead and
   cannot answer the question.
+* That check is a live test rather than a chore someone remembers:
+  `live_declared_permissions_match_what_github_accepts` asks GitHub what each
+  endpoint accepts and fails if a declaration does not cover it. It skips on a
+  classic token, so it cannot be the only guard — the unit tests in
+  `src/resources/requirement.rs` still pin the mappings offline.
