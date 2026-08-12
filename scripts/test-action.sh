@@ -22,6 +22,9 @@ PY
 mkdir -p bin
 cat > bin/gh <<'STUB'
 #!/usr/bin/env bash
+# Record the arguments too: which flags reach the binary is part of what the
+# action does, and a flag the subcommand does not accept is a usage error.
+printf '%s\n' "$*" >> "$FAKE_DIR/args"
 cat "$FAKE_DIR/$FAKE_CASE.json"
 exit "$FAKE_STATUS"
 STUB
@@ -43,11 +46,11 @@ cat > denied.json <<'J'
 J
 
 run() {
-  : > out; : > summary
+  : > out; : > summary; : > args
   set +e
   FAKE_DIR="$work" FAKE_CASE="$1" FAKE_STATUS="$2" PATH="$work/bin:$PATH" \
     GITHUB_OUTPUT="$work/out" GITHUB_STEP_SUMMARY="$work/summary" \
-    COMMAND="$3" REPOSITORY=o/r CONFIG='' ONLY='' PRUNE='' DRY_RUN=false VERBOSE=false SUMMARY=true \
+    COMMAND="$3" REPOSITORY=o/r CONFIG='' ONLY='' PRUNE="${4:-}" DRY_RUN=false VERBOSE=false SUMMARY=true \
     bash run.sh > stdout 2>&1
   actual=$?
   set -e
@@ -90,6 +93,26 @@ expect "success" false "$(grep '^success=' out | cut -d= -f2)"
 grep -q '::error title=gh-settings::' stdout || { echo "FAIL: no permission annotation"; exit 1; }
 grep -q 'cannot manage repository settings' stdout || { echo "FAIL: annotation does not explain the token"; exit 1; }
 echo "  ok: annotation names the token as the likely cause"
+
+echo "prune reaches the commands that accept it"
+run drift 2 plan true
+grep -q -- '--prune' args || { echo "FAIL: plan did not receive --prune"; cat args; exit 1; }
+echo "  ok: plan gets --prune"
+
+run applied 0 sync false
+grep -q -- '--no-prune' args || { echo "FAIL: sync did not receive --no-prune"; cat args; exit 1; }
+echo "  ok: sync gets --no-prune"
+
+echo "prune is withheld from the commands that reject it"
+for command in validate export doctor; do
+  run clean 0 "$command" true
+  if grep -q -- '--prune' args; then
+    echo "FAIL: $command received --prune, which it does not accept"
+    cat args
+    exit 1
+  fi
+  echo "  ok: $command does not get --prune"
+done
 
 echo
 echo "All action checks passed."

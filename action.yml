@@ -110,9 +110,16 @@ runs:
         [ -n "$ONLY" ] && args+=("--only" "$ONLY")
         [ "$VERBOSE" = "true" ] && args+=("--verbose")
 
-        case "$PRUNE" in
-          true) args+=("--prune") ;;
-          false) args+=("--no-prune") ;;
+        # `--prune` and `--dry-run` are subcommand flags, not global ones. Passing
+        # them to `validate`, `export` or `doctor` is a clap usage error naming an
+        # argument the user never wrote.
+        case "$COMMAND" in
+          sync|plan)
+            case "$PRUNE" in
+              true) args+=("--prune") ;;
+              false) args+=("--no-prune") ;;
+            esac
+            ;;
         esac
 
         if [ "$COMMAND" = "sync" ]; then
