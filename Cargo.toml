@@ -33,7 +33,6 @@ path = "src/lib.rs"
 
 [dependencies]
 # Errors & diagnostics
-anyhow = "1"
 thiserror = "2"
 miette = { version = "7", features = ["fancy"] }
 

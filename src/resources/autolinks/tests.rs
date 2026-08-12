@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::config::SpanIndex;
+use pretty_assertions::assert_eq;
 
 fn state(id: u64, prefix: &str, template: &str, alphanumeric: bool) -> AutolinkState {
     AutolinkState {

@@ -15,26 +15,9 @@ pub struct Args {
     #[arg(long, value_name = "PATH")]
     pub out: Option<std::path::PathBuf>,
 
-    /// Delete items present on GitHub but absent from the configuration.
-    #[arg(long, conflicts_with = "no_prune")]
-    pub prune: bool,
-
-    /// Never delete anything, overriding the configuration.
-    #[arg(long)]
-    pub no_prune: bool,
-}
-
-impl Args {
-    /// The prune override implied by the flags.
-    pub fn prune_opts(&self) -> crate::resources::PruneOpts {
-        crate::resources::PruneOpts {
-            force: match (self.prune, self.no_prune) {
-                (true, false) => Some(true),
-                (false, true) => Some(false),
-                _ => None,
-            },
-        }
-    }
+    /// Whether to delete what the configuration does not mention.
+    #[command(flatten)]
+    pub prune: crate::cli::PruneArgs,
 }
 
 /// Run the command.
@@ -54,7 +37,7 @@ pub async fn run(args: &Args, ctx: &Context) -> Result<i32> {
             ctx.client(),
             ctx.target()?,
             &config,
-            &args.prune_opts(),
+            &args.prune.prune_opts(),
             &ctx.args.only,
         )
         .await?;

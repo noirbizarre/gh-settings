@@ -53,39 +53,6 @@ where
     }
 }
 
-/// Record a field difference when two optional values disagree.
-///
-/// Returns `None` when the desired value is absent: an unspecified field is
-/// unmanaged and must never be reset to a default. This single rule is what makes
-/// partial configuration files safe.
-pub fn field<T>(name: &str, desired: Option<&T>, current: &T) -> Option<crate::resources::FieldDiff>
-where
-    T: PartialEq + std::fmt::Display,
-{
-    let desired = desired?;
-    (desired != current).then(|| {
-        crate::resources::FieldDiff::changed(name, current.to_string(), desired.to_string())
-    })
-}
-
-/// Like [`field`], but renders values with `Debug`.
-///
-/// Useful for `Option<String>`, where `Display` is unavailable and `None` should
-/// be visible in the plan as something other than an empty string.
-pub fn field_debug<T>(
-    name: &str,
-    desired: Option<&T>,
-    current: &T,
-) -> Option<crate::resources::FieldDiff>
-where
-    T: PartialEq + std::fmt::Debug,
-{
-    let desired = desired?;
-    (desired != current).then(|| {
-        crate::resources::FieldDiff::changed(name, format!("{current:?}"), format!("{desired:?}"))
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,29 +82,5 @@ mod tests {
         assert!(diff.created.is_empty());
         assert!(diff.matched.is_empty());
         assert!(diff.deleted.is_empty());
-    }
-
-    #[test]
-    fn an_unspecified_field_is_never_reset() {
-        // This is the guarantee that makes partial configuration files safe.
-        assert_eq!(
-            field("description", None::<&String>, &"current".to_string()),
-            None
-        );
-    }
-
-    #[test]
-    fn an_equal_field_produces_no_diff() {
-        let value = "same".to_string();
-        assert_eq!(field("description", Some(&value), &value), None);
-    }
-
-    #[test]
-    fn a_differing_field_records_before_and_after() {
-        let desired = "new".to_string();
-        let current = "old".to_string();
-        let diff = field("description", Some(&desired), &current).unwrap();
-        assert_eq!(diff.before.as_deref(), Some("old"));
-        assert_eq!(diff.after.as_deref(), Some("new"));
     }
 }

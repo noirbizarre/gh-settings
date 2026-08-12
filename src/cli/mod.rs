@@ -2,7 +2,8 @@
 //!
 //! The extension should be indistinguishable from a native `gh` command, so the
 //! conventions here mirror the GitHub CLI: `-R owner/repo`, repository inference
-//! from the git remote, `--json` for machine output, and `NO_COLOR` support.
+//! from the git remote, `--format json` for machine output, and `NO_COLOR`
+//! support.
 
 pub mod context;
 pub mod doctor;
@@ -54,6 +55,38 @@ pub struct Cli {
     /// Global options.
     #[command(flatten)]
     pub global: GlobalArgs,
+}
+
+/// The pruning override, shared by `plan` and `sync`.
+///
+/// Defined once and flattened into both. These are the two flags that decide
+/// whether the tool deletes anything, so a fix to their precedence that only
+/// landed on one of the two commands would be the worst possible kind of drift.
+#[derive(Debug, Default, clap::Args)]
+pub struct PruneArgs {
+    /// Delete items present on GitHub but absent from the configuration.
+    #[arg(long, conflicts_with = "no_prune")]
+    pub prune: bool,
+
+    /// Never delete anything, overriding the configuration.
+    #[arg(long)]
+    pub no_prune: bool,
+}
+
+impl PruneArgs {
+    /// The prune override implied by the flags.
+    ///
+    /// Neither flag means "no override": the configuration file decides, which
+    /// is what keeps pruning opt-in (ADR-005).
+    pub fn prune_opts(&self) -> crate::resources::PruneOpts {
+        crate::resources::PruneOpts {
+            force: match (self.prune, self.no_prune) {
+                (true, false) => Some(true),
+                (false, true) => Some(false),
+                _ => None,
+            },
+        }
+    }
 }
 
 /// Options accepted by every subcommand.

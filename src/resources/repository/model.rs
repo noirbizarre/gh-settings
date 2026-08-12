@@ -229,11 +229,6 @@ pub struct SecuritySettings {
 }
 
 impl SecuritySettings {
-    /// Whether nothing is declared.
-    pub fn is_empty(&self) -> bool {
-        *self == Self::default()
-    }
-
     /// Every declared feature, as `(api_key, enabled)` pairs.
     pub fn declared(&self) -> Vec<(&'static str, bool)> {
         [

@@ -28,7 +28,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::config::{Finding, Prunable, Settings};
+use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
 use crate::github::{
     GitHubClient, GitHubClientExt, Request, Resolver, Result as GitHubResult, Target,
@@ -326,25 +326,6 @@ fn from_state(state: &RulesetState) -> Ruleset {
     }
     .normalized()
 }
-
-/// Strip the server-only keys from a raw ruleset payload.
-pub fn strip_server_fields(value: &mut Map<String, Value>) {
-    for key in [
-        "id",
-        "node_id",
-        "created_at",
-        "updated_at",
-        "_links",
-        "current_user_can_bypass",
-        "source",
-        "source_type",
-    ] {
-        value.remove(key);
-    }
-}
-
-/// The `rulesets` configuration section.
-pub type Section = Prunable<Ruleset>;
 
 /// Build the JSON body for a ruleset.
 pub(crate) fn ruleset_body(ruleset: &Ruleset) -> Value {

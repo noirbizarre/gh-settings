@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::config::{Finding, Prunable, Settings};
+use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
 use crate::github::{GitHubClient, GitHubClientExt, Request, Result as GitHubResult, Target};
 use crate::resources::{Change, Op, PruneOpts, Requirement, Resource, ResourceId, ValidateCtx};
@@ -270,9 +270,6 @@ fn urlencode(value: &str) -> String {
         })
         .collect()
 }
-
-/// The `labels` configuration section.
-pub type Section = Prunable<Label>;
 
 #[cfg(test)]
 mod tests;

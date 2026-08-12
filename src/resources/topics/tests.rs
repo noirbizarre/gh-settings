@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::config::SpanIndex;
+use pretty_assertions::assert_eq;
 use rstest::rstest;
 
 fn desired(topics: &[&str], prune: bool) -> Desired {
@@ -168,6 +169,7 @@ mod validation {
 mod desired_projection {
     use super::*;
     use crate::config::Settings;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn is_none_when_no_section_is_declared() {

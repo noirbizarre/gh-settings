@@ -50,6 +50,19 @@ impl HumanRenderer {
             "{}",
             self.theme.heading(&format!("Plan for {}", plan.target))
         );
+
+        // Say where inherited changes came from. Half a plan can originate in a
+        // file the reader does not own, and `BaseMoved` exists precisely because
+        // that is hard to attribute after the fact.
+        for base in &plan.bases {
+            let commit = base
+                .commit
+                .as_deref()
+                .map(|commit| format!(" ({})", &commit[..commit.len().min(7)]))
+                .unwrap_or_default();
+            let _ = writeln!(out, "Inherits from {}{commit}", base.reference);
+        }
+
         let _ = writeln!(out);
 
         for resource in &plan.resources {

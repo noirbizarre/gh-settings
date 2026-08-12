@@ -275,15 +275,6 @@ impl BypassActor {
         )
     }
 
-    /// A stable sort key, so actor order never causes a spurious diff.
-    pub fn sort_key(&self) -> (String, u64, &'static str) {
-        (
-            self.actor_type.clone().unwrap_or_default(),
-            self.actor_id.unwrap_or(0),
-            self.bypass_mode.as_str(),
-        )
-    }
-
     /// A copy fit for writing back into a configuration file.
     ///
     /// `organization_admin` and the resolved `actor_id`/`actor_type` pair name
@@ -667,11 +658,6 @@ impl Ruleset {
         }
 
         // Report rules individually: "rules changed" is useless in a plan.
-        let current_types: Vec<&str> = current
-            .rules
-            .iter()
-            .map(|rule| rule.rule_type.as_str())
-            .collect();
         let desired_types: Vec<&str> = self
             .rules
             .iter()
@@ -713,7 +699,6 @@ impl Ruleset {
             }
         }
 
-        let _ = current_types;
         fields
     }
 }

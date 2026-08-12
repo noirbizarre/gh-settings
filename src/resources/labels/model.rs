@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::config::{Finding, suggest};
+use crate::config::Finding;
 use crate::resources::{FieldDiff, ValidateCtx};
 
 /// A single label.
@@ -215,19 +215,6 @@ fn is_valid_color(color: &str) -> bool {
     color.len() == 6 && color.chars().all(|character| character.is_ascii_hexdigit())
 }
 
-/// GitHub's own default labels, used to suggest corrections.
-const WELL_KNOWN: &[&str] = &[
-    "bug",
-    "documentation",
-    "duplicate",
-    "enhancement",
-    "good first issue",
-    "help wanted",
-    "invalid",
-    "question",
-    "wontfix",
-];
-
 /// Maximum length GitHub accepts for a label description.
 const MAX_DESCRIPTION: usize = 100;
 
@@ -338,9 +325,4 @@ pub fn validate(labels: &[Label], ctx: &ValidateCtx<'_>) -> Vec<Finding> {
     }
 
     findings
-}
-
-/// Suggest a well-known label name close to the given one.
-pub fn suggest_name(name: &str) -> Option<String> {
-    suggest(name, WELL_KNOWN)
 }

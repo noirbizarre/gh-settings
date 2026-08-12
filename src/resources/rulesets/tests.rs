@@ -73,10 +73,30 @@ fn an_empty_parameters_object_equals_an_absent_one() {
 }
 
 #[test]
-fn server_only_fields_are_stripped() {
+fn server_only_fields_never_reach_the_comparison() {
     // `id`, `created_at`, `_links` and friends are not configuration; letting
     // them into the comparison would make every ruleset permanently dirty.
-    let mut payload = serde_json::Map::new();
+    // Asserted against the real read path rather than a helper, so it stays
+    // true however that path is written.
+    let state: RulesetState = serde_json::from_value(json!({
+        "id": 42,
+        "node_id": "RRS_abc",
+        "name": "keep",
+        "target": "branch",
+        "enforcement": "active",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-02T00:00:00Z",
+        "source": "o/r",
+        "source_type": "Repository",
+        "current_user_can_bypass": "always",
+        "_links": {"self": {"href": "https://api.github.com/repos/o/r/rulesets/42"}},
+        "bypass_actors": [],
+        "rules": [],
+    }))
+    .unwrap();
+
+    let yaml = serde_norway::to_string(&from_state(&state)).unwrap();
+
     for key in [
         "id",
         "node_id",
@@ -84,14 +104,14 @@ fn server_only_fields_are_stripped() {
         "updated_at",
         "_links",
         "source",
+        "current_user_can_bypass",
     ] {
-        payload.insert(key.into(), json!("x"));
+        assert!(
+            !yaml.contains(key),
+            "`{key}` survived into the configuration:\n{yaml}"
+        );
     }
-    payload.insert("name".into(), json!("keep"));
-
-    strip_server_fields(&mut payload);
-
-    assert_eq!(payload.keys().collect::<Vec<_>>(), vec!["name"]);
+    assert!(yaml.contains("keep"), "{yaml}");
 }
 
 #[test]

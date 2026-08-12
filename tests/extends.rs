@@ -274,3 +274,40 @@ fn a_saved_plan_reports_a_moved_base_as_a_moved_base() {
         output.writes()
     );
 }
+
+#[test]
+fn the_plan_says_where_inherited_changes_came_from() {
+    // Half a plan can originate in a file the reader does not own. The JSON
+    // artifact has always recorded the base; the human rendering did not, which
+    // left the reader nothing to attribute a surprising change to.
+    let runner = with_base(
+        Sandbox::new().config("version: 1\nextends: acme/.github@v1\n"),
+        "labels:\n  - name: bug\n    color: d73a4a\n",
+    )
+    .get("repos/o/r/labels", "[]")
+    .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(2);
+    assert!(
+        output.stdout.contains("Inherits from acme/.github@v1"),
+        "{}",
+        output.stdout
+    );
+}
+
+#[test]
+fn a_plan_that_inherits_nothing_says_nothing_about_inheritance() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n")
+        .get("repos/o/r/labels", "[]")
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(2);
+    assert!(
+        !output.stdout.contains("Inherits from"),
+        "{}",
+        output.stdout
+    );
+}

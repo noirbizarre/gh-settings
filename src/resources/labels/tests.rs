@@ -6,6 +6,7 @@
 use super::*;
 use crate::config::{Prunable, SpanIndex};
 use crate::resources::FieldDiff;
+use pretty_assertions::assert_eq;
 use rstest::rstest;
 
 fn desired(labels: Vec<Label>, prune: bool) -> Desired {
@@ -225,6 +226,7 @@ fn label_names_are_url_encoded(#[case] name: &str, #[case] expected: &str) {
 
 mod api_shape {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn decodes_a_real_api_payload() {
@@ -269,6 +271,7 @@ mod api_shape {
 
 mod validation {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     fn findings(labels: Vec<Label>) -> Vec<Finding> {
         let spans = SpanIndex::default();
@@ -361,17 +364,19 @@ mod validation {
 
 mod section {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn a_bare_list_does_not_prune() {
-        let section: Section = serde_norway::from_str("- name: bug\n  color: d73a4a\n").unwrap();
+        let section: Prunable<Label> =
+            serde_norway::from_str("- name: bug\n  color: d73a4a\n").unwrap();
         assert!(!section.prune());
         assert_eq!(section.items().len(), 1);
     }
 
     #[test]
     fn the_object_form_can_opt_into_pruning() {
-        let section: Section =
+        let section: Prunable<Label> =
             serde_norway::from_str("prune: true\nitems:\n  - name: bug\n    color: d73a4a\n")
                 .unwrap();
         assert!(section.prune());

@@ -46,6 +46,13 @@ pub struct FindingOutput<'a> {
     /// Actionable hint.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub help: Option<&'a str>,
+    /// What the underlined span *is*, e.g. `already declared at labels.3`.
+    ///
+    /// The human rendering puts this under the underline. Without it the
+    /// machine-readable form was strictly less informative than the human one,
+    /// for the field carrying the most specific part of several diagnostics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<&'a str>,
 }
 
 /// JSON form of an apply run.
@@ -236,6 +243,7 @@ impl JsonRenderer {
                         .span
                         .map(|span| sources.get(span.source).name.as_str()),
                     help: finding.help.as_deref(),
+                    label: finding.label.as_deref(),
                 })
                 .collect(),
         };

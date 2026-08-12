@@ -26,6 +26,8 @@ src/engine/     registry, ordering, plan, apply — knows about no resource
 src/github/     the only place that talks to GitHub, behind GitHubClient
 src/output/     human and JSON renderers
 src/cli/        one module per subcommand
+src/diff/       generic keyed-collection diffing, used by the resources
+src/schema/     emits the published JSON Schema from the config types
 ```
 
 Dependencies point inward. A resource that imports from `engine` or `cli` is a
@@ -51,8 +53,9 @@ defeats the point.
 ## Style
 
 * Rust 2024, stable.
-* `anyhow` at the edges, `thiserror` for typed errors, `miette` when a
-  diagnostic needs a source span.
+* `miette` at the edges, `thiserror` for typed errors. A diagnostic that
+  underlines source text is a `miette` one; everything a caller might match on
+  is a typed error.
 * Doc comments on configuration types are user-facing: they end up in the
   published schema and in the generated reference.
 * Comments explain *why*, not *what*. If a line encodes a GitHub quirk, say

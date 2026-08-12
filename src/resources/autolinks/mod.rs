@@ -22,7 +22,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::config::{Finding, Prunable, Settings};
+use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
 use crate::github::{GitHubClient, GitHubClientExt, Request, Result as GitHubResult, Target};
 use crate::resources::{
@@ -416,9 +416,6 @@ pub fn validate(autolinks: &[Autolink], ctx: &ValidateCtx<'_>) -> Vec<Finding> {
 
     findings
 }
-
-/// The `autolinks` configuration section.
-pub type Section = Prunable<Autolink>;
 
 #[cfg(test)]
 mod tests;
