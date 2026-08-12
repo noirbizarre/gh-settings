@@ -52,11 +52,27 @@ currently the only one.
   resources by exact string equality to build one sentence instead of five.
   `ENVIRONMENTS` repeats `ADMINISTRATION`'s note verbatim for that reason.
 * Settling an ambiguous mapping needs a **fine-grained** token and the
-  `X-Accepted-GitHub-Permissions` response header, which spells "and" as `;`
-  and "or" as `,`. A classic token gets `X-Accepted-OAuth-Scopes` instead and
-  cannot answer the question.
+  `X-Accepted-GitHub-Permissions` response header. A classic token gets
+  `X-Accepted-OAuth-Scopes` instead and cannot answer the question.
+* That header's syntax is the opposite of the obvious reading, and we got it
+  wrong once: a **comma** joins permissions that are *all* required, and a
+  **semicolon** separates alternative sets. `pages=write,administration=write`
+  means both; `issues=read; pull_requests=read` means either. Assuming the
+  intuitive reading turns every finding inside out.
+* The header also uses wire names, not the names in the token UI: repository
+  variables are `actions_variables` there and "Variables" everywhere a human
+  looks.
 * That check is a live test rather than a chore someone remembers:
   `live_declared_permissions_match_what_github_accepts` asks GitHub what each
   endpoint accepts and fails if a declaration does not cover it. It skips on a
   classic token, so it cannot be the only guard — the unit tests in
   `src/resources/requirement.rs` still pin the mappings offline.
+* Its first run paid for itself: it found that the Pages writes need
+  `Administration: write` as well as `Pages: write`, which no amount of reading
+  the published table would have settled.
+* A declared requirement and `github_token_capable` can legitimately disagree.
+  Pages needs `Administration: write` as a fine-grained token yet remains
+  manageable with the Actions token, because that is a different permission
+  system with a `pages` key of its own. When in doubt the flag stays `true`: a
+  false refusal cannot be overruled, while a false permission is merely a 403
+  from GitHub with an explanation attached.

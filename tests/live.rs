@@ -368,24 +368,36 @@ fn live_pages_enable_and_update() {
 /// second thing that can be wrong.
 fn permission_label(term: &str) -> Option<(String, String)> {
     let (name, access) = term.trim().split_once('=')?;
-    let mut name = name.trim().replace('_', " ");
-    if let Some(first) = name.get_mut(0..1) {
-        first.make_ascii_uppercase();
-    }
+    let name = match name.trim() {
+        // The header's identifier is not always the name the token UI and
+        // GitHub's own reference table use. Repository variables are
+        // `actions_variables` on the wire and "Variables" everywhere a human
+        // reads them.
+        "actions_variables" => "Variables".to_string(),
+        other => {
+            let mut name = other.replace('_', " ");
+            if let Some(first) = name.get_mut(0..1) {
+                first.make_ascii_uppercase();
+            }
+            name
+        }
+    };
     Some((name, access.trim().to_string()))
 }
 
 /// Whether `requirement` covers every permission in one of the alternatives
 /// GitHub offered.
 ///
-/// `;` separates permissions that are **all** required; `,` separates
-/// alternatives, any one of which suffices. That distinction is the entire
-/// reason this test exists: GitHub's published table collapses both into a
-/// single checkmark.
+/// The value is "a comma separated list of the permissions that are required.
+/// Occasionally, you can choose from multiple permission sets. In these cases,
+/// multiple comma-separated lists will be separated by a semicolon." So `,`
+/// means **and**, `;` means **or** — the opposite way round from the intuition,
+/// and the distinction is the entire reason this test exists: GitHub's
+/// published table collapses both into a single checkmark.
 fn satisfies(requirement: &gh_settings::resources::Requirement, header: &str) -> bool {
-    header.split(',').any(|alternative| {
+    header.split(';').any(|alternative| {
         alternative
-            .split(';')
+            .split(',')
             .filter_map(permission_label)
             .all(|(name, access)| {
                 requirement.fine_grained.iter().any(|declared| {
@@ -545,24 +557,67 @@ mod accepted_permissions {
     }
 
     #[test]
-    fn a_semicolon_means_every_permission_is_required() {
-        // Neither alone is enough, so a declaration of one must not pass.
+    fn a_comma_means_every_permission_is_required() {
+        // Verbatim from the probe: `PUT /repos/{o}/{r}/pages` answers
+        // `pages=write,administration=write`, and both are needed. Declaring
+        // one of them is not enough.
         assert!(!satisfies(
-            &Requirement::PAGES,
-            "pages=write; administration=write"
+            &Requirement::ISSUES,
+            "pages=write,administration=write"
         ));
         assert!(satisfies(
             &Requirement::ENVIRONMENTS,
-            "administration=write; actions=read"
+            "administration=write,actions=read"
         ));
     }
 
     #[test]
-    fn a_comma_means_any_one_of_them_is_enough() {
+    fn a_semicolon_separates_alternatives() {
+        // `GET /repos/{o}/{r}/labels` answers `issues=read; pull_requests=read`:
+        // either alone suffices, which is why declaring Issues is correct.
         assert!(satisfies(
-            &Requirement::PAGES,
-            "pages=write, administration=write"
+            &Requirement::ISSUES,
+            "issues=read; pull_requests=read"
         ));
+    }
+
+    #[test]
+    fn the_wire_name_for_repository_variables_is_actions_variables() {
+        // The header says `actions_variables`; the token UI and GitHub's own
+        // reference table both say "Variables".
+        assert_eq!(
+            permission_label("actions_variables=read"),
+            Some(("Variables".to_string(), "read".to_string()))
+        );
+        assert!(satisfies(&Requirement::VARIABLES, "actions_variables=read"));
+    }
+
+    /// The answers GitHub actually gave, copied from the first run of the live
+    /// probe against the sandbox.
+    ///
+    /// The probe itself only runs on a fine-grained token, which most runs do
+    /// not have. Recording its output means the mappings are still checked on
+    /// every ordinary `cargo test` — and that a change to the parser has to
+    /// keep agreeing with reality, not just with itself.
+    #[test]
+    fn the_recorded_answers_are_all_satisfied() {
+        for (header, requirement) in [
+            ("actions=read", &Requirement::ENVIRONMENTS),
+            ("actions=read", &Requirement::VARIABLES),
+            ("actions_variables=read", &Requirement::VARIABLES),
+            ("environments=read", &Requirement::VARIABLES),
+            ("environments=read", &Requirement::ENVIRONMENTS),
+            ("issues=read; pull_requests=read", &Requirement::ISSUES),
+            ("metadata=read", &Requirement::ADMINISTRATION),
+            ("pages=read", &Requirement::PAGES),
+            ("pages=write,administration=write", &Requirement::PAGES),
+        ] {
+            assert!(
+                satisfies(requirement, header),
+                "[{}] does not cover {header}",
+                requirement.fine_grained_summary()
+            );
+        }
     }
 
     #[test]

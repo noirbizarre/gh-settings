@@ -193,35 +193,25 @@ impl Requirement {
 
     /// GitHub Pages.
     ///
-    /// The odd one out among the repository-level settings: `pages` *is* a key
-    /// in the workflow `permissions:` block, so unlike `administration` and
-    /// `variables` this is a grant an Actions workflow can actually make.
-    /// `actions/configure-pages` enables a site with `pages: write` and nothing
-    /// else, which is why `github_token_capable` is asserted rather than
-    /// hedged.
+    /// Three permissions, and the third was a surprise: `PUT /repos/{o}/{r}/pages`
+    /// answers `X-Accepted-GitHub-Permissions: pages=write,administration=write`,
+    /// and a comma in that header means *and*. GitHub's published table lists
+    /// the Pages writes under both permissions without saying whether it means
+    /// both or either; the header says both. Confirmed by
+    /// `live_declared_permissions_match_what_github_accepts`.
     ///
-    /// The *fine-grained* mapping is the uncertain one. GitHub's reference
-    /// lists `POST`, `PUT` and `DELETE /repos/{o}/{r}/pages` under **both**
-    /// `Pages: write` and `Administration: write`, with the marker that means
-    /// either "needs more than one of these" or "needs any one of these" —
-    /// without saying which. `Pages: write` alone is therefore our best
-    /// understanding and the minimal claim, but it is not confirmed, so it is
-    /// marked as such rather than asserted (ADR-015).
-    ///
-    /// To settle it, send a request with a deliberately invalid body using a
-    /// **fine-grained** token and read `X-Accepted-GitHub-Permissions`, which
-    /// spells "and" as `;` and "or" as `,`:
-    ///
-    /// ```sh
-    /// gh api -i -X PUT repos/OWNER/REPO/pages -f build_type=nonsense | grep -i x-accepted
-    /// ```
-    ///
-    /// The header is only emitted for fine-grained tokens — a classic PAT gets
-    /// `X-Accepted-OAuth-Scopes` instead, which answers a different question.
+    /// `github_token_capable` stays `true` even so, because the Actions token
+    /// is a different permission system from a fine-grained PAT: `pages` is a
+    /// key in the workflow `permissions:` block and `actions/configure-pages`
+    /// enables a site with `pages: write` alone. Claiming otherwise would make
+    /// `sync` refuse a workflow that works today, and a false refusal cannot be
+    /// overruled — there is no flag for it. Being wrong in that direction is
+    /// the expensive one.
     pub const PAGES: Requirement = Requirement {
         fine_grained: &[
             FineGrained::documented("Metadata", Access::Read),
-            FineGrained::unverified("Pages", Access::Write),
+            FineGrained::documented("Pages", Access::Write),
+            FineGrained::documented("Administration", Access::Write),
         ],
         classic: &["repo"],
         github_token_capable: true,
@@ -479,19 +469,19 @@ mod tests {
     }
 
     #[test]
-    fn pages_is_the_only_mapping_still_unconfirmed() {
-        // GitHub lists the Pages writes under both Pages: write and
-        // Administration: write, with a marker that means either "both" or
-        // "either" without saying which. We declare the minimal claim and admit
-        // it (ADR-015). Everything else is settled, so this test is also the
-        // reminder to delete the footnote once a fine-grained token has read
-        // `X-Accepted-GitHub-Permissions` for `PUT /repos/{o}/{r}/pages`.
-        assert!(Requirement::PAGES.has_unverified());
+    fn every_mapping_is_settled_against_github() {
+        // Every one of these was checked against
+        // `X-Accepted-GitHub-Permissions` by
+        // `live_declared_permissions_match_what_github_accepts`, which is why
+        // nothing is `Unverified` any more and the docs carry no footnote. A
+        // new mapping that cannot be confirmed belongs here as an exception,
+        // with a reason.
         for requirement in [
             &Requirement::ADMINISTRATION,
             &Requirement::ISSUES,
             &Requirement::VARIABLES,
             &Requirement::ENVIRONMENTS,
+            &Requirement::PAGES,
             &Requirement::CONTENTS,
         ] {
             assert!(
@@ -500,6 +490,24 @@ mod tests {
                 requirement.fine_grained_summary()
             );
         }
+    }
+
+    #[test]
+    fn pages_writes_also_need_administration() {
+        // `pages=write,administration=write`, and a comma in that header means
+        // "and". The published table would not have told us.
+        assert!(Requirement::PAGES.fine_grained.iter().any(|permission| {
+            permission.name == "Administration" && permission.access == Access::Write
+        }));
+    }
+
+    #[test]
+    fn pages_stays_reachable_with_the_actions_token() {
+        // Even though it needs Administration: write as a fine-grained PAT. The
+        // Actions token is a different permission system, `pages` is a key in
+        // the workflow `permissions:` block, and a false refusal cannot be
+        // overruled.
+        assert!(requirement(&Requirement::PAGES).github_token_capable);
     }
 
     mod verdict {
