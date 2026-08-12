@@ -166,6 +166,41 @@ A single label.
 | `new_name` | string | no | Rename this label to the given name. |
 
 
+## `pages`
+
+GitHub Pages.
+
+Declaring this section enables Pages if it is off. It never turns Pages
+off again: an omitted section means unmanaged, so there is nothing to
+express "disabled" with.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `build_type` | `legacy` \| `workflow` | no | How the site is built: from a branch (`legacy`) or by a workflow. |
+| `cname` | string | no | Custom domain for the site. |
+| `https_enforced` | boolean | no | Whether HTTP requests are redirected to HTTPS. |
+| `source` | object | no | Branch and directory to publish from. |
+
+
+### `pages.source`
+
+Branch and directory to publish from.
+
+Only meaningful with `build_type: legacy`; GitHub rejects a source sent
+for a workflow-built site.
+
+```yaml
+source:
+  branch: gh-pages
+  path: /docs
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `branch` | string | yes | Branch the site is published from, for example `gh-pages`. |
+| `path` | string | no | Directory within the branch, either `/` or `/docs`. |
+
+
 ## `repository`
 
 Repository metadata: description, homepage, features, merge and security

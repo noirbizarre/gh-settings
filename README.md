@@ -218,6 +218,14 @@ environments:
 variables:
   - name: DEFAULT_REGION
     value: eu-west-1
+
+pages:
+  build_type: legacy
+  source:
+    branch: gh-pages
+    path: /
+  cname: docs.example.com
+  https_enforced: true
 ```
 
 Every section is **optional**, and an absent section is **unmanaged** — nothing
@@ -334,6 +342,7 @@ Resources
   ✔ rulesets
   ✔ environments
   ✔ variables
+  ✔ pages
 ```
 
 Full details, including the exact scopes each resource needs, are in
@@ -358,9 +367,14 @@ rather than a guess.
 | Rulesets | ✅ |
 | Environments (protection rules, reviewers, branch policies) | ✅ |
 | Actions variables, at repository and environment scope | ✅ |
+| GitHub Pages (source, custom domain, HTTPS) | ✅ |
 | Inheritance from a shared repository (`extends:`) | ✅ |
 
-Custom properties, webhooks, Pages and collaborators are planned; secrets are
+Declaring a `pages:` section enables Pages; it is never turned back off, because
+an absent section means unmanaged and a published site should not come down over
+a missing key.
+
+Custom properties, webhooks and collaborators are planned; secrets are
 [deliberately out of scope](docs/adr/009-secrets-out-of-scope.md).
 
 The guiding ambition: *if it is under the repository Settings page, it should

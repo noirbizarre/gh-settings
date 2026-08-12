@@ -1471,3 +1471,146 @@ fn plan_renders_environments_and_variables() {
     output.expect_status(2);
     assert_cli_snapshot!(output.stdout);
 }
+
+const PAGES_SITE: &str = r#"{
+    "build_type": "legacy",
+    "source": {"branch": "gh-pages", "path": "/"},
+    "cname": "docs.example.com",
+    "https_enforced": true,
+    "public": true
+}"#;
+
+// Note the `public` above: the API reports it, but neither `POST` nor `PUT`
+// accepts it, so it must never appear in a request body.
+
+#[test]
+fn plan_does_not_read_pages_when_unmanaged() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    assert!(
+        !output.requests.iter().any(|r| r.ends_with("/pages")),
+        "read pages despite them being unmanaged: {:?}",
+        output.requests
+    );
+}
+
+#[test]
+fn sync_enables_pages_with_a_post_then_a_put() {
+    // `POST /pages` accepts only the build type and source, so anything else has
+    // to follow in a `PUT` against the site it has just created.
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  build_type: legacy\n  source:\n    branch: gh-pages\n  cname: docs.example.com\n")
+        .respond("GET", "repos/o/r/pages", Fixture::error(404, "Not Found"))
+        .respond("POST", "repos/o/r/pages", Fixture::created("{}"))
+        .respond("PUT", "repos/o/r/pages", Fixture::no_content())
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 2, "{writes:?}");
+    assert!(writes[0].starts_with("POST repos/o/r/pages"), "{writes:?}");
+    assert!(writes[0].contains(r#""branch":"gh-pages""#), "{writes:?}");
+    // The domain cannot ride along with the creation.
+    assert!(!writes[0].contains("cname"), "{writes:?}");
+    assert!(writes[1].starts_with("PUT repos/o/r/pages"), "{writes:?}");
+    assert!(
+        writes[1].contains(r#""cname":"docs.example.com""#),
+        "{writes:?}"
+    );
+}
+
+#[test]
+fn sync_leaves_an_unmanaged_pages_field_alone() {
+    // The property the whole design rests on: a file setting only
+    // `https_enforced` must not reset the custom domain or the build type.
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  https_enforced: false\n")
+        .get("repos/o/r/pages", PAGES_SITE)
+        .respond("PUT", "repos/o/r/pages", Fixture::no_content())
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(
+        writes[0].contains(r#""https_enforced":false"#),
+        "{writes:?}"
+    );
+    assert!(!writes[0].contains("cname"), "{writes:?}");
+    assert!(!writes[0].contains("build_type"), "{writes:?}");
+}
+
+#[test]
+fn sync_never_disables_pages_even_with_prune() {
+    // There is no way to declare "off", so `--prune` has nothing to act on. A
+    // published site must not come down because of a missing key.
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  build_type: legacy\n  source:\n    branch: gh-pages\n")
+        .get("repos/o/r/pages", PAGES_SITE)
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes", "--prune"]);
+    output.expect_status(0);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+}
+
+#[test]
+fn a_pages_domain_differing_only_in_case_is_not_a_change() {
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  build_type: legacy\n  cname: Docs.Example.COM\n")
+        .get("repos/o/r/pages", PAGES_SITE)
+        .build();
+
+    runner.run(&["plan", "-R", "o/r"]).expect_status(0);
+}
+
+#[test]
+fn the_pages_plan_reads_the_way_it_should() {
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  build_type: legacy\n  source:\n    branch: gh-pages\n    path: /docs\n  cname: new.example.com\n")
+        .get("repos/o/r/pages", PAGES_SITE)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r", "--verbose"]);
+    output.expect_status(2);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn enabling_pages_reads_the_way_it_should() {
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  build_type: workflow\n  https_enforced: true\n")
+        .respond("GET", "repos/o/r/pages", Fixture::error(404, "Not Found"))
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r", "--verbose"]);
+    output.expect_status(2);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn the_public_flag_is_never_sent_even_though_github_reports_it() {
+    // `GET /pages` returns `public`, but it is not a body parameter of either
+    // endpoint. It is rejected by the schema, so it cannot reach a request.
+    let runner = Sandbox::new()
+        .config("version: 1\npages:\n  public: false\n")
+        .get("repos/o/r/pages", PAGES_SITE)
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(1);
+    assert!(output.writes().is_empty(), "{:?}", output.writes());
+    assert!(
+        output.stderr.contains("public"),
+        "the rejection must name the field\n{}",
+        output.stderr
+    );
+}

@@ -11,6 +11,7 @@ use common::{Sandbox, default_repository};
 fn populated() -> Sandbox {
     Sandbox::new()
         .repository(&default_repository())
+        .no_pages()
         .get("repos/o/r/topics", r#"{"names": ["rust", "github-cli"]}"#)
         .get(
             "repos/o/r/labels",
@@ -169,6 +170,7 @@ fn omits_sections_the_repository_has_nothing_for() {
     // would also be a loaded gun.
     let runner = Sandbox::new()
         .repository(&default_repository())
+        .no_pages()
         .get("repos/o/r/topics", r#"{"names": []}"#)
         .get("repos/o/r/labels", "[]")
         .get("repos/o/r/autolinks", "[]")
@@ -195,6 +197,7 @@ fn never_exports_the_archived_flag() {
             &common::repository_with(&[("description", "x")])
                 .replace(r#""archived":false"#, r#""archived":true"#),
         )
+        .no_pages()
         .build();
 
     let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
@@ -233,7 +236,10 @@ fn export_renders_a_populated_repository() {
 
 #[test]
 fn export_renders_a_repository_with_nothing_to_export() {
-    let runner = Sandbox::new().repository(&default_repository()).build();
+    let runner = Sandbox::new()
+        .repository(&default_repository())
+        .no_pages()
+        .build();
     let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
     output.expect_status(0);
     assert_cli_snapshot!(output.stdout);
@@ -330,6 +336,7 @@ fn exported_environments_round_trip_to_an_empty_plan() {
     let output = Sandbox::new()
         .config(&exported)
         .repository(&default_repository())
+        .no_pages()
         .get("repos/o/r/topics", r#"{"names": ["rust", "github-cli"]}"#)
         .get(
             "repos/o/r/labels",
@@ -358,4 +365,61 @@ fn exported_environments_round_trip_to_an_empty_plan() {
 
     output.expect_status(0);
     assert!(output.stdout.contains("up to date"), "{}", output.stdout);
+}
+
+#[test]
+fn a_repository_without_pages_exports_no_pages_section() {
+    // `GET /pages` answers 404 when Pages is off, and an absent site is a state
+    // to describe by saying nothing, not by writing an empty block.
+    let runner = populated().build();
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+    assert!(!output.stdout.contains("pages:"), "{}", output.stdout);
+}
+
+#[test]
+fn an_exported_site_round_trips_to_an_empty_plan() {
+    let site = r#"{"build_type": "legacy", "source": {"branch": "gh-pages", "path": "/docs"}, "cname": "docs.example.com", "https_enforced": true, "public": true}"#;
+
+    let runner = Sandbox::new()
+        .repository(&default_repository())
+        .get("repos/o/r/pages", site)
+        .build();
+    runner
+        .run(&["export", "-R", "o/r", "--force"])
+        .expect_status(0);
+
+    let exported = common::read(runner.path(), ".github/settings.yml");
+    assert!(exported.contains("pages:"), "{exported}");
+
+    let output = Sandbox::new()
+        .config(&exported)
+        .repository(&default_repository())
+        .get("repos/o/r/pages", site)
+        .build()
+        .run(&["plan", "-R", "o/r"]);
+    output.expect_status(0);
+    assert!(output.stdout.contains("up to date"), "{}", output.stdout);
+}
+
+#[test]
+fn a_site_without_a_custom_domain_exports_no_cname() {
+    // Exporting `cname: null` would turn a description of the current state into
+    // an instruction to clear something.
+    let runner = Sandbox::new()
+        .repository(&default_repository())
+        .get(
+            "repos/o/r/pages",
+            r#"{"build_type": "workflow", "cname": null}"#,
+        )
+        .build();
+
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+    assert!(
+        output.stdout.contains("build_type: workflow"),
+        "{}",
+        output.stdout
+    );
+    assert!(!output.stdout.contains("cname"), "{}", output.stdout);
 }

@@ -329,3 +329,39 @@ fn live_variables_at_both_scopes() {
 
     live.cleanup();
 }
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_pages_enable_and_update() {
+    // The one test that can settle what `POST /pages` and `PUT /pages` actually
+    // accept — in particular that the settings `POST` refuses do land in the
+    // follow-up `PUT`, and that a `source` may travel without a `build_type`.
+    //
+    // Deliberately no `cname`: a custom domain needs DNS that a sandbox
+    // repository does not have, and `https_enforced` cannot be set until GitHub
+    // has issued a certificate for it.
+    let live = live_or_skip!();
+
+    live.config(&only("pages:\n  build_type: workflow\n"));
+    live.run(&["sync", "--yes", "--only", "pages"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "pages"]).expect_up_to_date();
+
+    // Switch to a branch build: `source` and `build_type` must travel together.
+    live.config(&only(
+        "pages:\n  build_type: legacy\n  source:\n    branch: gh-pages\n    path: /\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "pages"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "pages"]).expect_up_to_date();
+
+    // The normalisation contract: `docs` and `/docs` are the same directory.
+    live.config(&only(
+        "pages:\n  build_type: legacy\n  source:\n    branch: gh-pages\n    path: docs\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "pages"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "pages"]).expect_up_to_date();
+
+    live.cleanup();
+}

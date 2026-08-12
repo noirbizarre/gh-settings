@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::resources::autolinks::Autolink;
 use crate::resources::environments::Environment;
 use crate::resources::labels::Label;
+use crate::resources::pages::PagesSettings;
 use crate::resources::repository::RepositorySettings;
 use crate::resources::rulesets::Ruleset;
 use crate::resources::variables::Variable;
@@ -98,6 +99,14 @@ pub struct Settings {
     /// instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variables: Option<Prunable<Variable>>,
+
+    /// GitHub Pages.
+    ///
+    /// Declaring this section enables Pages if it is off. It never turns Pages
+    /// off again: an omitted section means unmanaged, so there is nothing to
+    /// express "disabled" with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pages: Option<PagesSettings>,
 }
 
 impl Settings {
@@ -135,6 +144,7 @@ impl Settings {
             && self.rulesets.is_none()
             && self.environments.is_none()
             && self.variables.is_none()
+            && self.pages.is_none()
     }
 
     /// Cross-section checks that no individual resource can perform.

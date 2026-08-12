@@ -1,0 +1,12 @@
+---
+source: tests/sync.rs
+expression: output.stdout
+---
+Plan for o/r
+
+Pages
+  ~ update pages (2 fields)
+      source: gh-pages:/ → gh-pages:/docs
+      cname: docs.example.com → new.example.com
+
+1 to update.

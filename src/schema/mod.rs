@@ -107,6 +107,9 @@ mod tests {
             "labels",
             "autolinks",
             "rulesets",
+            "environments",
+            "variables",
+            "pages",
         ] {
             assert!(properties.contains_key(section), "{section} is missing");
         }

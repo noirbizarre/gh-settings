@@ -16,6 +16,7 @@ Resources
   ✘ rulesets      missing the `repo` scope
   ✘ environments  missing the `repo` scope
   ✘ variables     missing the `repo` scope
+  ✘ pages         missing the `repo` scope
 
   ✘ extends       missing the `repo` scope
 

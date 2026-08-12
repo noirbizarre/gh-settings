@@ -150,6 +150,21 @@ impl Requirement {
         ),
     };
 
+    /// GitHub Pages.
+    ///
+    /// The odd one out among the repository-level settings: `pages` *is* a key
+    /// in the workflow `permissions:` block, so unlike `administration` and
+    /// `variables` this is a grant an Actions workflow can actually make.
+    pub const PAGES: Requirement = Requirement {
+        fine_grained: &[
+            FineGrained::documented("Metadata", Access::Read),
+            FineGrained::documented("Pages", Access::Write),
+        ],
+        classic: &["repo"],
+        github_token_capable: true,
+        github_token_note: None,
+    };
+
     /// What it takes to read a configuration inherited from another repository.
     /// Not a resource requirement: it is needed while *loading* the
     /// configuration, before any resource is consulted. Listed here because it
@@ -299,6 +314,15 @@ mod tests {
     }
 
     #[test]
+    fn pages_are_reachable_with_the_actions_token() {
+        // `pages: write` is a real key in the workflow `permissions:` block, so
+        // a Pages-only CI workflow needs no extra credential.
+        let pages = requirement(&Requirement::PAGES);
+        assert!(pages.github_token_capable);
+        assert!(pages.github_token_note.is_none());
+    }
+
+    #[test]
     fn every_requirement_demands_metadata_read() {
         // Fine-grained tokens are useless without it, so forgetting it in a new
         // resource would produce a table that cannot actually work.
@@ -306,6 +330,7 @@ mod tests {
             &Requirement::ADMINISTRATION,
             &Requirement::ISSUES,
             &Requirement::VARIABLES,
+            &Requirement::PAGES,
         ] {
             assert!(
                 requirement

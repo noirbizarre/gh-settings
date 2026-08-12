@@ -226,7 +226,12 @@ fn doctor_emits_json() {
     assert_eq!(value["authentication"]["account"], "tester");
 
     let resources = value["resources"].as_array().expect("resources");
-    assert_eq!(resources.len(), 7);
+    // Derived rather than hardcoded: adding a resource should not silently drop
+    // out of the doctor report, but neither should it fail an unrelated count.
+    assert_eq!(
+        resources.len(),
+        gh_settings::resources::ResourceId::ALL.len()
+    );
     assert!(
         resources
             .iter()

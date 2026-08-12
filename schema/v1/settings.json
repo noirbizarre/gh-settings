@@ -27,6 +27,21 @@
       ],
       "type": "object"
     },
+    "BuildType": {
+      "description": "How the site is built.",
+      "oneOf": [
+        {
+          "const": "legacy",
+          "description": "GitHub builds the site from a branch, with its own Jekyll pipeline.",
+          "type": "string"
+        },
+        {
+          "const": "workflow",
+          "description": "The site is published by an Actions workflow.",
+          "type": "string"
+        }
+      ]
+    },
     "BypassActor": {
       "additionalProperties": false,
       "description": "Who may bypass a ruleset.\n\nDeclared by slug rather than id: numeric ids are neither stable across\norganisations nor meaningful to a human reading the file, which would make an\nexported configuration unusable anywhere but its origin. Resolution happens in\n[`Resource::prepare`](crate::resources::Resource::prepare).",
@@ -283,6 +298,49 @@
           "type": "string"
         }
       ]
+    },
+    "PagesSettings": {
+      "additionalProperties": false,
+      "description": "The `pages` configuration section.\n\nDeclaring the section enables GitHub Pages if it is off. It never turns Pages\nback off: an omitted section means *unmanaged*, so there is no way to express\n\"disabled\", and destroying a published site is not something a missing key\nshould do (ADR-005).\n\n```yaml\npages:\n  build_type: workflow\n  cname: docs.example.com\n  https_enforced: true\n```",
+      "properties": {
+        "build_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BuildType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the site is built: from a branch (`legacy`) or by a workflow."
+        },
+        "cname": {
+          "description": "Custom domain for the site.\n\nSet to `null` to remove it and fall back to the `github.io` address.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "https_enforced": {
+          "description": "Whether HTTP requests are redirected to HTTPS.\n\nGitHub refuses to enable this until it has provisioned a certificate for\nthe custom domain, which can take a while after `cname` is first set. A\n`sync` that sets both at once may need running twice.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch and directory to publish from.\n\nOnly meaningful with `build_type: legacy`; GitHub rejects a source sent\nfor a workflow-built site.\n\n```yaml\nsource:\n  branch: gh-pages\n  path: /docs\n```"
+        }
+      },
+      "type": "object"
     },
     "ProtectedKeyword": {
       "description": "The only word accepted where a policy keyword is expected.",
@@ -835,6 +893,27 @@
       },
       "type": "object"
     },
+    "Source": {
+      "additionalProperties": false,
+      "description": "The branch and directory a `legacy` build publishes from.",
+      "properties": {
+        "branch": {
+          "description": "Branch the site is published from, for example `gh-pages`.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Directory within the branch, either `/` or `/docs`.\n\nGitHub supports no other value. Written without the leading slash it is\nadded for you, so `docs` and `/docs` mean the same thing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "branch"
+      ],
+      "type": "object"
+    },
     "SquashCommitMessage": {
       "description": "Squash merge commit message source.",
       "oneOf": [
@@ -954,6 +1033,17 @@
         }
       ],
       "description": "Issue and pull request labels."
+    },
+    "pages": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PagesSettings"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "GitHub Pages.\n\nDeclaring this section enables Pages if it is off. It never turns Pages\noff again: an omitted section means unmanaged, so there is nothing to\nexpress \"disabled\" with."
     },
     "repository": {
       "anyOf": [

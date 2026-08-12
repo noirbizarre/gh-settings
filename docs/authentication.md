@@ -17,7 +17,7 @@ cannot manage.
 | Where | Credential | Works? |
 |---|---|---|
 | Your machine | `gh auth login` | ✅ everything |
-| GitHub Actions | `secrets.GITHUB_TOKEN` | ⚠️ **labels only** |
+| GitHub Actions | `secrets.GITHUB_TOKEN` | ⚠️ **labels and Pages only** |
 | GitHub Actions | a PAT in a secret | ✅ everything |
 | GitHub Actions | a GitHub App installation token | ✅ everything (optional) |
 
@@ -41,8 +41,8 @@ Neither key exists in that list, so they are *structurally* unavailable to
 `GITHUB_TOKEN` — this is not a permission you forgot to enable, it cannot be
 granted at all.
 
-Labels are the exception: they fall under `Issues: write`, which `GITHUB_TOKEN`
-can hold.
+Labels and Pages are the exceptions. Labels fall under `Issues: write`, and
+`pages` is in the list above — both are permissions `GITHUB_TOKEN` can hold.
 
 ### The working Actions setup
 
@@ -68,24 +68,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_SETTINGS_TOKEN }}
 ```
 
-### The labels-only setup
+### The labels-and-Pages setup
 
-If labels are all you need, the built-in token is enough and you can skip
-managing a secret entirely:
+If labels and Pages are all you need, the built-in token is enough and you can
+skip managing a secret entirely:
 
 ```yaml
 jobs:
-  labels:
+  settings:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      pages: write
     steps:
       - uses: actions/checkout@v5
       - run: gh extension install noirbizarre/gh-settings
-      - run: gh settings sync --yes --only labels
+      - run: gh settings sync --yes --only labels,pages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+Request only the permissions you actually use: a job that manages labels alone
+needs `issues: write` and nothing more.
 
 ### Using a GitHub App anyway
 
@@ -115,6 +119,7 @@ The App needs the repository permissions listed below.
 | **Metadata** | Read | Mandatory baseline for every fine-grained token |
 | **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets`, `environments` |
 | **Issues** | Read & write | `labels` |
+| **Pages** | Read & write | `pages` |
 | **Variables** | Read & write | `variables`, including the ones nested under an environment |
 | **Contents** | Read | Reading a base named in `extends:` — **on that repository**, not this one |
 | *Organization → Members* | Read | Resolving `bypass_actors: [{ team: … }]` and environment reviewers named by team (organisation repositories only) |
@@ -155,6 +160,7 @@ actually enforces.
 | `rulesets` | Metadata: read, Administration: write | `repo` | ✘ |
 | `environments` | Metadata: read, Administration: write | `repo` | ✘ |
 | `variables` | Metadata: read, Variables: write † | `repo` | ✘ |
+| `pages` | Metadata: read, Pages: write | `repo` | ✔ |
 | `extends` | Contents: read | `repo` | ✘ |
 
 † This mapping is inferred rather than confirmed against GitHub's own reference. It is our best understanding, not a guarantee; `gh settings doctor` will tell you what your token can actually do.

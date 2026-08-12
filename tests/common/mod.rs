@@ -125,6 +125,15 @@ impl Sandbox {
         self.get("repos/o/r", body)
     }
 
+    /// Answer the Pages read the way a repository that publishes nothing does.
+    ///
+    /// Worth registering explicitly: an unregistered read answers `[]`, which
+    /// serde happily reads as an all-default site, so a repository with no Pages
+    /// would otherwise look like one with a site and no settings.
+    pub fn no_pages(self) -> Self {
+        self.respond("GET", "repos/o/r/pages", Fixture::error(404, "Not Found"))
+    }
+
     /// Set the scopes the stub's `gh auth status` reports.
     ///
     /// Mirrors real `gh`, which reports scopes inline for classic tokens and

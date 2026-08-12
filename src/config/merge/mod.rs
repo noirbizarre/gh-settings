@@ -26,6 +26,7 @@ use super::source::SourceId;
 use super::spans::SpanIndex;
 use crate::config::Prunable;
 use crate::resources::labels::model::key as label_key;
+use crate::resources::pages::PagesSettings;
 use crate::resources::repository::{RepositorySettings, SecuritySettings};
 
 /// One document taking part in a merge.
@@ -55,6 +56,7 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
     );
 
     let repository = merge_repository(&mut provenance, base, child);
+    let pages = merge_pages(&mut provenance, base, child);
 
     let topics = merge_section(
         &mut provenance,
@@ -119,6 +121,7 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
         rulesets,
         environments,
         variables,
+        pages,
     };
 
     (settings, provenance)
@@ -235,6 +238,58 @@ fn merge_repository(
         anonymous_access_enabled: field!(anonymous_access_enabled),
         archived: field!(archived),
         security: merge_security(provenance, base.id, b.security, child.id, *security),
+    })
+}
+
+/// Merge the pages section, field by field.
+///
+/// Field-wise for the same reason as `repository`: every field is an `Option`,
+/// so a child changing the `cname` must not unmanage the base's `build_type`.
+fn merge_pages(
+    provenance: &mut Provenance,
+    base: &Layer<'_>,
+    child: &Layer<'_>,
+) -> Option<PagesSettings> {
+    let base_pages = base.settings.pages.as_ref();
+    let child_pages = child.settings.pages.as_ref();
+
+    if base_pages.is_none() && child_pages.is_none() {
+        return None;
+    }
+
+    let empty = PagesSettings::default();
+    let b = base_pages.unwrap_or(&empty);
+    let c = child_pages.unwrap_or(&empty);
+
+    // Exhaustive, with no `..`, for the same reason as `merge_repository`.
+    let PagesSettings {
+        build_type,
+        source,
+        cname,
+        https_enforced,
+    } = c;
+
+    macro_rules! field {
+        ($name:ident) => {
+            pick(
+                provenance,
+                concat!("pages.", stringify!($name)),
+                base.id,
+                b.$name.as_ref(),
+                child.id,
+                $name.as_ref(),
+            )
+        };
+    }
+
+    Some(PagesSettings {
+        build_type: field!(build_type),
+        // Taken whole rather than merged: `branch` is not an `Option`, so a
+        // child overriding only `path` would otherwise inherit a branch it
+        // never mentioned. Same reasoning as collections.
+        source: field!(source),
+        cname: field!(cname),
+        https_enforced: field!(https_enforced),
     })
 }
 

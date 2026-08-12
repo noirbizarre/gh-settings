@@ -22,9 +22,9 @@ eventually be manageable here.*
 | Inheritance (`extends:`) | ✅ | single level, ref pinned, `prune` never inherited |
 | Environments | ✅ | protection rules, reviewers and deployment branch policies |
 | Actions variables | ✅ | repository and environment scope; values are readable, so they diff |
+| Pages | ✅ | build type, source, custom domain and HTTPS; declaring the section enables the site, nothing ever disables it. The `public` flag is reported by the API but not settable through it, so it is not offered |
 | Custom properties | planned | |
 | Webhooks | planned | |
-| Pages | planned | |
 | Collaborators & teams | planned | |
 | Branch protection (legacy) | planned | rulesets are the modern equivalent and already supported |
 | Repository interactions | planned | |
@@ -44,7 +44,7 @@ reason stops applying.
 ### Verification
 
 - [x] **A live test suite** against a real throwaway repository, `#[ignore]`d
-      and gated on `GH_SETTINGS_TEST_REPO`. Nine tests covering each resource's
+      and gated on `GH_SETTINGS_TEST_REPO`. Twelve tests covering each resource's
       create → update → prune cycle, re-planning after every mutation. Runs
       nightly and on demand; refuses to start against a repository that already
       has managed configuration. Run it yourself with

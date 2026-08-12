@@ -348,3 +348,52 @@ fn a_path_no_document_declares_is_not_recorded() {
     let (_, provenance, _) = merged("version: 1\n", "version: 1\n");
     assert_eq!(provenance.resolve("repository.private"), None);
 }
+
+// --- pages ------------------------------------------------------------------
+
+#[test]
+fn pages_fields_merge_individually() {
+    let (settings, _, _) = merged(
+        "pages:\n  build_type: legacy\n  cname: base.example.com\n",
+        "pages:\n  cname: child.example.com\n",
+    );
+    let pages = settings.pages.as_ref().expect("pages");
+    assert_eq!(
+        pages.cname,
+        Some(Some("child.example.com".to_string())),
+        "the child's field wins"
+    );
+    assert_eq!(
+        pages.build_type,
+        Some(crate::resources::pages::BuildType::Legacy),
+        "a field the child never mentioned stays inherited"
+    );
+}
+
+#[test]
+fn a_child_clearing_the_custom_domain_beats_the_base_setting_it() {
+    let (settings, _, _) = merged(
+        "pages:\n  build_type: legacy\n  cname: base.example.com\n",
+        "pages:\n  cname: null\n",
+    );
+    assert_eq!(settings.pages.as_ref().unwrap().cname, Some(None));
+}
+
+#[test]
+fn an_inherited_source_is_replaced_whole_rather_than_field_by_field() {
+    // `branch` is not an `Option`, so a child overriding only `path` would
+    // otherwise inherit a branch it never mentioned.
+    let (settings, _, _) = merged(
+        "pages:\n  source:\n    branch: gh-pages\n    path: /\n",
+        "pages:\n  source:\n    branch: main\n",
+    );
+    let source = settings.pages.as_ref().unwrap().source.as_ref().unwrap();
+    assert_eq!(source.branch, "main");
+    assert_eq!(source.path, None);
+}
+
+#[test]
+fn pages_are_unmanaged_when_neither_document_declares_them() {
+    let (settings, _, _) = merged("labels: []\n", "topics: []\n");
+    assert!(settings.pages.is_none());
+}

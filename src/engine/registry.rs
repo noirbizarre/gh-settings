@@ -7,7 +7,7 @@
 
 use crate::resources::{
     ErasedResource, ResourceId, autolinks::Autolinks, environments::Environments, labels::Labels,
-    repository::Repository, rulesets::Rulesets, topics::Topics, variables::Variables,
+    pages::Pages, repository::Repository, rulesets::Rulesets, topics::Topics, variables::Variables,
 };
 
 /// The ordered set of resources the engine orchestrates.
@@ -28,6 +28,7 @@ impl Default for Registry {
             Box::new(Rulesets),
             Box::new(Environments),
             Box::new(Variables),
+            Box::new(Pages),
         ])
     }
 }
@@ -150,6 +151,7 @@ mod tests {
                 ResourceId::Rulesets,
                 ResourceId::Environments,
                 ResourceId::Variables,
+                ResourceId::Pages,
             ]
         );
     }
@@ -206,14 +208,20 @@ mod tests {
     }
 
     #[test]
-    fn only_labels_are_reachable_with_the_actions_token() {
-        // Pins the claim made in the documentation and by `doctor`. If GitHub
-        // ever adds an `administration` permission to GITHUB_TOKEN, this test
-        // fails and the docs get revisited.
+    fn only_labels_and_pages_are_reachable_with_the_actions_token() {
+        // Pins the claim made in the documentation and by `doctor`. `issues` and
+        // `pages` are keys in the workflow `permissions:` block; `administration`
+        // and `variables` are not, so nothing else can be granted. If GitHub ever
+        // adds one, this test fails and the docs get revisited.
+        const CAPABLE: &[ResourceId] = &[ResourceId::Labels, ResourceId::Pages];
         for resource in Registry::default().all() {
             let capable = resource.requirement().github_token_capable;
-            let expected = resource.id() == ResourceId::Labels;
-            assert_eq!(capable, expected, "{} capability changed", resource.id());
+            assert_eq!(
+                capable,
+                CAPABLE.contains(&resource.id()),
+                "{} capability changed",
+                resource.id()
+            );
         }
     }
 

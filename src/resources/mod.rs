@@ -16,6 +16,7 @@ pub mod requirement;
 pub mod autolinks;
 pub mod environments;
 pub mod labels;
+pub mod pages;
 pub mod repository;
 pub mod rulesets;
 pub mod topics;
@@ -52,6 +53,8 @@ pub enum ResourceId {
     Environments,
     /// Actions variables, at repository and environment scope.
     Variables,
+    /// GitHub Pages.
+    Pages,
 }
 
 impl ResourceId {
@@ -64,6 +67,7 @@ impl ResourceId {
         Self::Rulesets,
         Self::Environments,
         Self::Variables,
+        Self::Pages,
     ];
 
     /// The identifier as it appears in `--only`, plan output and JSON.
@@ -76,6 +80,7 @@ impl ResourceId {
             Self::Rulesets => "rulesets",
             Self::Environments => "environments",
             Self::Variables => "variables",
+            Self::Pages => "pages",
         }
     }
 
@@ -89,6 +94,7 @@ impl ResourceId {
             Self::Rulesets => "Rulesets",
             Self::Environments => "Environments",
             Self::Variables => "Variables",
+            Self::Pages => "Pages",
         }
     }
 

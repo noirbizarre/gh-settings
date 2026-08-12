@@ -1,0 +1,12 @@
+---
+source: tests/sync.rs
+expression: output.stdout
+---
+Plan for o/r
+
+Pages
+  + enable GitHub Pages
+      build_type: workflow
+      https_enforced: true
+
+1 to create.

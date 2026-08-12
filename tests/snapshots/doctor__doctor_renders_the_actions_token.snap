@@ -16,6 +16,7 @@ Resources
   ✘ rulesets      requires Administration: write, which cannot be granted to GITHUB_TOKEN
   ✘ environments  requires Administration: write, which cannot be granted to GITHUB_TOKEN
   ✘ variables     requires Variables: write, which cannot be granted to GITHUB_TOKEN
+  ✔ pages
 
   ✘ extends       requires Contents: read on the *other* repository, which GITHUB_TOKEN does not have
 
