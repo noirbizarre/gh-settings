@@ -93,6 +93,12 @@ A fourth, optional layer runs the real binary against a real repository
 unless `GH_SETTINGS_TEST_REPO` names one, so an ordinary `mise run` never
 touches the network.
 
+CI runs it on every push to `main` that touches the code, nightly, and on
+demand — never on a pull request, because forks cannot read the sandbox
+credential and one repository cannot serve several runs at once. So a change
+that only the real API can falsify is caught shortly after merge, not before
+it. Running it yourself before opening the PR is the way to find out sooner.
+
 **Bring your own sandbox.** The repository CI uses belongs to CI. The tests
 mutate whatever they are pointed at, and the pre-flight refuses a repository
 that already holds managed configuration — so two people sharing one do not

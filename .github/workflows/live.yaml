@@ -4,14 +4,35 @@ name: 🌍 Live
 # that GitHub accepts them, nor show what GitHub sends back — and both bugs
 # fixed in 0.1.0 lived in exactly that gap. This runs the real thing.
 #
+# Three triggers, for three different questions:
+#
+#   push      did this change break against the real API? Within minutes of
+#             landing, rather than at 04:17 the next morning.
+#   schedule  did GitHub change under us? Nothing in this repository moves, so
+#             only a clock can ask — which is what the permission drift test
+#             needs.
+#   dispatch  answer either on demand.
+#
 # Deliberately not on pull requests: a network-dependent, rate-limited job
-# holding a credential has no business blocking someone's PR, and forks cannot
-# read the secret anyway.
+# holding a credential has no business blocking someone's PR, forks cannot read
+# the secret anyway, and every run mutates the one shared sandbox.
 
 on:
+  push:
+    branches: [main]
+    # A deny-list rather than an allow-list of `src/**`, `tests/**` and friends.
+    # An allow-list fails silently: add a directory that matters, forget to list
+    # it here, and coverage disappears with nothing to say so. This fails the
+    # other way, by occasionally spending two minutes on a commit that did not
+    # need it. Note a commit touching both docs and code still runs — the skip
+    # needs *every* changed file to match.
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "*.svg"
   schedule:
-    # Nightly. Drift against the real API is caught within a day, which is fast
-    # enough for something no user is waiting on.
+    # `paths-ignore` does not apply here, so this runs whatever changed —
+    # including nothing at all, which is the case it exists for.
     - cron: "17 4 * * *"
   workflow_dispatch:
 
@@ -19,6 +40,8 @@ permissions:
   contents: read
 
 # Every test targets the same repository, so two runs would race each other.
+# Deliberately no `github.ref` suffix, unlike ci.yaml: the sandbox is shared, so
+# a push run and the nightly must queue rather than run side by side.
 # Never cancel: a cancelled run leaves that repository part-way through a change.
 concurrency:
   group: live

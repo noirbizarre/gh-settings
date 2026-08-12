@@ -44,9 +44,11 @@ reason stops applying.
 ### Verification
 
 - [x] **A live test suite** against a real throwaway repository, `#[ignore]`d
-      and gated on `GH_SETTINGS_TEST_REPO`. Twelve tests covering each resource's
-      create → update → prune cycle, re-planning after every mutation. Runs
-      nightly and on demand; refuses to start against a repository that already
+      and gated on `GH_SETTINGS_TEST_REPO`. Thirteen tests covering each resource's
+      create → update → prune cycle, re-planning after every mutation, plus one
+      that asks GitHub which permissions each endpoint really requires. Runs on
+      every push to `main` that touches the code, nightly, and on demand;
+      refuses to start against a repository that already
       has managed configuration. Run it yourself with
       `GH_SETTINGS_TEST_REPO=you/sandbox mise run test:live` — the sandbox must
       be **public**, since a private repository on the free plan answers
