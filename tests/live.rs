@@ -17,6 +17,11 @@
 
 mod common;
 
+// The resource count below is derived rather than written down: a literal was
+// correct when there were five resources and silently stopped covering the
+// three added since.
+use gh_settings::engine::Registry;
+
 // `Live` is referenced through the `live_or_skip!` macro, which spells out the
 // full path so it works from any test file.
 
@@ -246,9 +251,15 @@ fn live_doctor_reports_the_real_credential() {
 
     assert_eq!(value["ok"], true, "{}", output.stdout);
     assert!(value["gh_version"].is_string());
+    // The credential's identity, and the only place it is visible.
+    assert!(
+        value["authentication"]["token_kind"].is_string(),
+        "{}",
+        output.stdout
+    );
     assert_eq!(
         value["resources"].as_array().map(Vec::len),
-        Some(5),
+        Some(Registry::default().all().count()),
         "{}",
         output.stdout
     );
