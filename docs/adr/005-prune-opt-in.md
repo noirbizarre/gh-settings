@@ -35,6 +35,7 @@ containing any destructive change prints a warning and requires confirmation.
 * Adopting the tool on an existing repository is safe by construction. This is
   the property that makes migration plausible.
 * We diverge from `safe-settings`, so a migrated configuration will not prune
-  until pruning is explicitly enabled. Documented in the migration guide.
+  until pruning is explicitly enabled. To be documented in the migration guide,
+  which the roadmap still lists as unwritten.
 * Reaching a truly declarative state requires a deliberate opt-in, which is the
   correct place for that decision to be made.

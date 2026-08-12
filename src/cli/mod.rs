@@ -176,7 +176,7 @@ pub enum ColorChoice {
 /// The available commands.
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Check the configuration file without contacting GitHub.
+    /// Check the configuration file. Contacts GitHub only to read an `extends` base.
     #[command(visible_alias = "check")]
     Validate(validate::Args),
 

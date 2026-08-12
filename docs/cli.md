@@ -26,7 +26,7 @@ Accepted by every command.
 
 ### `gh settings validate`  <small>(alias: `check`)</small>
 
-Check the configuration file without contacting GitHub
+Check the configuration file. Contacts GitHub only to read an `extends` base
 
 | Option | Description |
 |---|---|

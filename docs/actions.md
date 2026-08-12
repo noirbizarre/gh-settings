@@ -70,8 +70,8 @@ change without opening the logs.
 
 ## Checking a pull request
 
-`validate` needs no network, no repository and no credentials, which makes it
-safe on pull requests from forks:
+`validate` needs no repository and, unless the file uses `extends:`, no network
+and no credentials either — which makes it safe on pull requests from forks:
 
 ```yaml
 on: pull_request
@@ -85,6 +85,12 @@ jobs:
         with:
           command: validate
 ```
+
+!!! warning "Unless the configuration inherits"
+
+    A file using `extends:` reads another repository, so it needs a token with
+    `Contents: read` **there** — which a fork's workflow token does not have.
+    See [Authentication](authentication.md#inheriting-from-another-repository).
 
 ## Labels only, with no secret
 

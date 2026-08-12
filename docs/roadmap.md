@@ -19,6 +19,7 @@ eventually be manageable here.*
 | Labels | ✅ | including renames, which preserve issue assignments |
 | Autolinks | ✅ | changes are delete-and-recreate; GitHub has no update endpoint |
 | Rulesets | ✅ | unknown rule types round-trip untouched rather than being dropped |
+| Inheritance (`extends:`) | ✅ | single level, ref pinned, `prune` never inherited |
 | Custom properties | planned | |
 | Environments & variables | planned | variables are readable, so they can be diffed |
 | Webhooks | planned | |
@@ -96,7 +97,8 @@ cannot disagree about what a token can do.
 
 ### Features
 
-- [x] **A composite action** — `uses: noirbizarre/gh-settings@v1`. Maps exit
+- [x] **A composite action** — `uses: noirbizarre/gh-settings@main` until the
+      first release carries it, `@v1` after. Maps exit
       code 2 to a `changed` output rather than a failed job, writes the plan to
       the job summary, and annotates a 403 with the token explanation. See
       [GitHub Actions](actions.md).
@@ -121,10 +123,11 @@ cannot disagree about what a token can do.
 
 - [ ] Installation page with per-platform notes and upgrading.
 - [ ] Quick start: export → validate → plan → sync on an existing repository.
-- [ ] Migration guide from `safe-settings` — what is read, what is not
-      (org-level `suborgs`/`overrides`), and above all that **pruning is off by
-      default**, so the first run is non-destructive. That difference is the
-      main reason to migrate and is currently buried in an ADR.
+- [ ] Migration guide from `safe-settings` — what is read, what has to be
+      removed before the file will parse (org-level `suborgs`/`overrides`,
+      `branches`, `collaborators`), and above all that **pruning is off by
+      default**, so the first run is non-destructive. The README and the index
+      both say so; what is missing is the step-by-step.
 - [ ] FAQ: why not safe-settings, why no secrets, why a `403`, why a PAT in CI.
 
 ### Infrastructure
@@ -143,7 +146,7 @@ it.
 | | Decision |
 |---|---|
 | **Secrets** | [ADR-009](adr/009-secrets-out-of-scope.md) — write-only values cannot be diffed, exported or made idempotent. Use `gh secret set`. |
-| **Org-level `suborgs` / `overrides`** | [ADR-006](adr/006-safe-settings-compatibility.md) — `safe-settings` compatibility is one-way and per-repository. An `extends:` mechanism may return later on its own merits, not as compatibility. |
+| **Org-level `suborgs` / `overrides`** | [ADR-006](adr/006-safe-settings-compatibility.md) — `safe-settings` compatibility is one-way and per-repository. Sharing configuration between repositories now exists as [`extends:`](adr/017-inheritance.md), on its own merits rather than as compatibility; `suborgs` and `overrides` themselves remain out of scope. |
 | **A `diff` command** | `plan --verbose` already shows field-level before/after; a second command for the same output is surface without substance. |
 | **A typed enum of ruleset rules** | GitHub ships new rule types faster than any client tracks them. The untyped passthrough is deliberate: an unrecognised rule round-trips untouched rather than being silently dropped on the next sync. |
 | **GraphQL** | [ADR-004](adr/004-rest-first.md) — autolinks, topics, rulesets, environments and custom properties have no GraphQL mutations at all. |

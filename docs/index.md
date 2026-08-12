@@ -26,6 +26,8 @@ Run `sync` twice and the second run reports nothing to do.
 
 * [Authentication](authentication.md) — **start here if you got a `403`**
 * [Configuration reference](configuration.md) — every field, generated from the schema
+* [CLI reference](cli.md) — every command and flag, generated from the parser
+* [GitHub Actions](actions.md) — running it in a workflow
 * [Architecture decisions](adr/README.md) — why the tool is built the way it is
 
 ## Two things worth knowing up front

@@ -32,15 +32,20 @@ Labels
 Autolinks
   ~ recreate autolink OPS- (no update endpoint)
 
-3 to create, 2 to update, 1 to delete.
+2 to create, 2 to update, 1 to recreate, 1 to delete.
+! this plan deletes existing configuration.
 ```
 
 ```console
 $ gh settings sync --yes
 ✔ update repository description
 ✔ add topic rust
+✔ remove topic archived
 ✔ create label enhancement
-✔ applied 3 changes.
+✔ update label bug
+✔ recreate autolink OPS- (no update endpoint)
+
+✔ applied 6 changes.
 ```
 
 Run it twice and the second run reports nothing to do. That is the point.
@@ -62,9 +67,12 @@ it is a fine tool — if you can run a GitHub App.
 | Formal, versioned schema | no | yes |
 | Editor completion | no | yes |
 
-`gh-settings` reads existing `safe-settings` files for the sections it supports,
-so migrating is not a rewrite. See [ADR-006](docs/adr/006-safe-settings-compatibility.md)
-for exactly how far that goes.
+`gh-settings` uses the same spelling as `safe-settings` for the sections it
+supports, so those need no rewriting. Sections it does not support yet — like
+`branches` or `collaborators` — have to be removed first: unknown keys are a
+parse error, which is what lets a typo be caught and suggested against. See
+[ADR-006](docs/adr/006-safe-settings-compatibility.md) for exactly how far
+compatibility goes.
 
 ---
 
@@ -74,11 +82,10 @@ for exactly how far that goes.
 gh extension install noirbizarre/gh-settings
 ```
 
-Or build from source:
-
-```sh
-cargo install --git https://github.com/noirbizarre/gh-settings
-```
+That is the only supported install path, deliberately — see
+[ADR-014](docs/adr/014-releases.md). Building from source with `cargo build`
+produces a standalone `gh-settings` binary rather than a `gh` subcommand, so the
+`gh settings …` examples below would not apply to it.
 
 ---
 
@@ -359,6 +366,7 @@ mise run test      # cargo nextest
 mise run cover     # coverage
 mise run snapshots # review insta snapshots
 mise run schema    # regenerate the JSON Schema
+mise run docs:reference # regenerate the configuration reference
 mise run docs      # serve the documentation locally
 ```
 

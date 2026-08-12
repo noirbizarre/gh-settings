@@ -127,6 +127,10 @@ was read at, taken from the ETag the fetch already returns.
   current state rather than intent; subtracting inherited values would mean
   `export` could no longer run on a repository with no configuration at all.
 * The saved plan format gains a defaulted field and stays at version 1.
+* This narrows [ADR-010](010-plan-artifact.md), which says the fingerprint is
+  derived "only from the target and the changes". It now also covers each
+  inherited base and the commit it was read at, so a base that moved makes a
+  different plan even when the resulting changes happen to coincide.
 * Two shipped bugs were found on the way and fixed first, because the merge
   would have been built on top of them: ruleset findings underlined whichever
   rule sorted into the position, and a configuration using only

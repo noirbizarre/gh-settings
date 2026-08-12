@@ -24,12 +24,14 @@ each commit.
 |---|---|
 | `mise run` | Format, lint, lint the workflows, build, test |
 | `mise run test` | `cargo nextest run` (accepts nextest selectors) |
+| `mise run test:live` | The live suite, against `GH_SETTINGS_TEST_REPO` |
 | `mise run cover` | Coverage via `cargo llvm-cov` |
 | `mise run snapshots` | Review pending `insta` snapshots |
 | `mise run lint` | Clippy with `-D warnings` |
 | `mise run lint:actions` | `actionlint` over the workflows |
 | `mise run spell` | `typos` |
 | `mise run schema` | Regenerate the committed JSON Schema |
+| `mise run schema:check` | Fail if the committed schema is stale (what CI runs) |
 | `mise run docs:reference` | Regenerate the configuration reference from it |
 | `mise run docs` | Serve the documentation locally |
 | `mise run dogfood` | `gh ship validate` — check the release setup |

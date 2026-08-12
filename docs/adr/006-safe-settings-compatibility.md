@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. The `extends:` clause below is narrowed by
+[ADR-017](017-inheritance.md), which builds the mechanism this deferred.
 
 ## Context
 
@@ -20,20 +21,27 @@ promising a formal, versioned JSON Schema. The two cannot both be true.
 
 ## Decision
 
-Compatibility is **one-way and per-repository**: a `safe-settings` file is read
-for the sections we support. Our JSON Schema is our own contract and may extend
-beyond theirs.
+Compatibility is **one-way and per-repository**: the *sections* a `safe-settings`
+file uses are read with the same spelling, so they need no rewriting. Our JSON
+Schema is our own contract and may extend beyond theirs.
+
+It is not a drop-in read. The schema sets `deny_unknown_fields`, which is what
+produces the "did you mean" suggestion on a typo, and an unsupported section —
+`branches`, `collaborators`, `teams`, `milestones` — is therefore a parse error
+rather than something quietly skipped. Migrating means deleting those sections
+first.
 
 Concretely, `repository.topics` is accepted as a synonym for the top-level
 `topics`. Declaring both is an error rather than an arbitrary precedence.
 
 Organisation-level features — `suborgs`, `overrides`, `.github` inheritance —
 are out of scope. An `extends:` mechanism may be revisited later on its own
-merits, not as compatibility.
+merits, not as compatibility. *(It since was: see [ADR-017](017-inheritance.md).)*
 
 ## Consequences
 
-* Migration is a single command for the settings we support.
+* Migration is mechanical for the settings we support, but not automatic: the
+  sections we do not support have to be removed before the file will parse.
 * We own our schema and can version it properly.
 * Users of the organisation-level features of `safe-settings` are not served by
   this tool yet, and the documentation says so plainly.

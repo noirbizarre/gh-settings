@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. The fingerprint's inputs are widened by
+[ADR-017](017-inheritance.md), which adds the inherited bases.
 
 ## Context
 

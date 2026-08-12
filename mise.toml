@@ -38,7 +38,7 @@ cargo-binstall = "latest"
 # --- Everyday ---------------------------------------------------------------
 
 [tasks.default]
-description = "Run fmt, lint, build and test"
+description = "Run fmt, lint, lint:actions, build and test"
 depends = ["fmt", "lint", "lint:actions", "build", "test"]
 
 [tasks.build]
