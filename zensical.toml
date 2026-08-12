@@ -34,6 +34,12 @@ nav = [
 
 language = "en"
 
+# The header slot is one line tall and already sits next to the site name, so
+# it gets the mark alone — the wordmark would render as an illegible sliver and
+# repeat the name. The full logo is on the home page instead.
+logo = "images/icon.svg"
+favicon = "images/icon.svg"
+
 features = [
   "content.action.edit",
   "content.code.annotate",

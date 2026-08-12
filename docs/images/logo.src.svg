@@ -1,0 +1,22 @@
+<svg viewBox="77 52 2555 597" width="2555" height="597"
+     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <!-- Source for docs/images/logo.svg. Do not use this file directly: the
+       wordmark is a <text> element here, so it only renders where Fira Sans is
+       installed. `mise run logo` outlines it into paths and writes the file the
+       README, the documentation site and the social preview actually use.
+
+       The mark is referenced rather than copied, so it cannot drift from
+       icon.svg; scripts/gen-logo.py resolves the reference at build time.
+
+       The viewBox is the ink bounding box, so the logo carries no dead margin
+       and every consumer can size it by width alone. Re-measure it if the text
+       or the placement below changes.
+
+       Colours: the grey and the green both clear contrast on white and on the
+       documentation's dark scheme, which is why there is one logo and not a
+       light and a dark variant. -->
+  <image href="icon.svg" x="0" y="0" width="700" height="700"/>
+  <text x="780" y="455" font-family="Fira Sans" font-size="360">
+    <tspan fill="#7D8590" font-weight="400">gh-</tspan><tspan fill="#05AB42" font-weight="600">settings</tspan>
+  </text>
+</svg>

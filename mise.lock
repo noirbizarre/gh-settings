@@ -90,6 +90,14 @@ backend = "cargo:cargo-llvm-cov"
 version = "0.9.130"
 backend = "cargo:cargo-nextest"
 
+[[tools."cargo:resvg"]]
+version = "0.47.0"
+backend = "cargo:resvg"
+
+[[tools."cargo:usvg"]]
+version = "0.48.1"
+backend = "cargo:usvg"
+
 [[tools.git-cliff]]
 version = "2.12.0"
 backend = "aqua:orhun/git-cliff"

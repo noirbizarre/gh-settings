@@ -34,6 +34,12 @@ cargo-binstall = "latest"
 "cargo:cargo-nextest" = "latest"
 "cargo:cargo-llvm-cov" = "latest"
 "cargo:cargo-insta" = "latest"
+# Rasterizes the SVG assets (see the `icons` and `social` tasks). Pure Rust, so
+# it needs no system libraries and renders identically on every platform.
+"cargo:resvg" = "latest"
+# Flattens the wordmark <text> in logo.src.svg into paths (see the `logo`
+# task), so the logo needs no font installed wherever it is displayed.
+"cargo:usvg" = "latest"
 
 # --- Everyday ---------------------------------------------------------------
 
@@ -145,3 +151,49 @@ run = "uvx zensical serve"
 [tasks."docs:build"]
 description = "Build the documentation"
 run = "uvx zensical build"
+
+# --- Artwork ----------------------------------------------------------------
+#
+# None of these join `default`: they rewrite committed binaries, so a routine
+# run would dirty the working tree every time. Run them when the artwork
+# changes — `logo` after editing logo.src.svg, all three after editing
+# icon.svg, since the logo embeds the mark and the social preview embeds the
+# logo.
+
+[tasks.logo]
+description = "Rebuild docs/images/logo.svg from logo.src.svg"
+# The wordmark is a <text> element in the source so it stays editable, but text
+# renders only where Fira Sans is installed — and the logo is displayed on
+# GitHub, on the documentation site and in the social card. usvg converts it to
+# paths once, here, between the two fixups gen-logo.py exists for: inlining the
+# mark, and restoring the viewBox usvg drops. Both are explained in that file.
+run = """
+python3 scripts/gen-logo.py inline docs/images/logo.src.svg \
+  | usvg --font-family "Fira Sans" - -c \
+  | python3 scripts/gen-logo.py viewbox > docs/images/logo.svg
+echo "docs/images/logo.svg"
+"""
+
+[tasks.icons]
+description = "Rasterize docs/images/icon.svg into the PNG sizes"
+run = """
+for size in 128 256 512; do
+  resvg --width "$size" --height "$size" docs/images/icon.svg "docs/images/icon-$size.png"
+  echo "docs/images/icon-$size.png"
+done
+"""
+
+[tasks.social]
+description = "Render the GitHub social preview image from the logo"
+# GitHub has no API for the social preview, so this is generated here and
+# uploaded by hand, once, under:
+#   Settings -> General -> Social preview
+#
+# The canvas lives in social-preview.svg rather than being passed as flags:
+# resvg scales to fit rather than padding, so --width 1280 --height 640 on a
+# wide logo yields 1280x299, not GitHub's required 1280x640. The wrapper
+# references logo.svg instead of copying it, so the two cannot drift.
+run = """
+resvg docs/images/social-preview.svg docs/images/social-preview.png
+echo "docs/images/social-preview.png — upload under Settings > General > Social preview"
+"""

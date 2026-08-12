@@ -1,4 +1,6 @@
-# gh-settings
+<p align="center" markdown>
+  ![gh-settings](images/logo.svg){ width="520" }
+</p>
 
 Declarative GitHub repository settings for the GitHub CLI.
 

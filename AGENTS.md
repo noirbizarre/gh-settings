@@ -50,6 +50,19 @@ defeats the point.
 * `README.md` — whenever a command, flag or supported setting changes.
 * `docs/adr/` — whenever a decision is made or reversed.
 
+## Artwork is generated
+
+`docs/images/logo.svg` and every PNG under `docs/images/` are build outputs.
+Edit `icon.svg` or `logo.src.svg`, never the results, then run:
+
+* `mise run logo` — after changing `logo.src.svg` (the wordmark is `<text>`
+  there and outlined paths in the output, so it needs no font installed).
+* `mise run icons` and `mise run social` — after changing `icon.svg`, because
+  the logo embeds the mark and the social preview embeds the logo.
+
+These tasks are deliberately outside `default` and `docs:check`: they rewrite
+committed binaries, so running them routinely would dirty the tree.
+
 ## Style
 
 * Rust 2024, stable.

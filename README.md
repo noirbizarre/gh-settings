@@ -1,6 +1,24 @@
-# gh-settings
+<p align="center">
+  <img src="docs/images/logo.svg" alt="gh-settings" width="520" />
+</p>
 
-> Declarative GitHub repository settings for the GitHub CLI.
+<p align="center">
+  <em>Declarative GitHub repository settings for the GitHub CLI.</em>
+</p>
+<p align="center">
+  <a href="https://github.com/noirbizarre/gh-settings/actions/workflows/ci.yaml">
+    <img src="https://github.com/noirbizarre/gh-settings/actions/workflows/ci.yaml/badge.svg" alt="CI">
+  </a>
+  <a href="https://codecov.io/gh/noirbizarre/gh-settings">
+    <img src="https://codecov.io/gh/noirbizarre/gh-settings/graph/badge.svg" alt="Codecov">
+  </a>
+  <img src="https://img.shields.io/github/v/release/noirbizarre/gh-settings" alt="Release">
+  <img src="https://img.shields.io/github/license/noirbizarre/gh-settings" alt="License">
+</p>
+
+---
+
+# gh-settings
 
 Make repository configuration behave like infrastructure as code. One
 `.github/settings.yml` describes the desired state; `gh settings` computes the
@@ -8,8 +26,6 @@ difference and applies it.
 
 No GitHub App. No central service. No webhook. Just the GitHub CLI you already
 have.
-
----
 
 ## ✨ What it does
 
