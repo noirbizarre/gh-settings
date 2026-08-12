@@ -40,6 +40,7 @@ struct IdOnly {
 pub struct Resolver {
     teams: Mutex<HashMap<String, u64>>,
     apps: Mutex<HashMap<String, u64>>,
+    users: Mutex<HashMap<String, u64>>,
 }
 
 impl Resolver {
@@ -94,10 +95,34 @@ impl Resolver {
         Ok(id)
     }
 
+    /// Resolve a user login to its identifier.
+    ///
+    /// Unlike a team slug this is not organisation-scoped: a login is global,
+    /// so the cache is keyed by the login alone.
+    pub async fn user(&self, client: &dyn GitHubClient, login: &str) -> Result<u64> {
+        if let Some(id) = self.users.lock().await.get(login) {
+            return Ok(*id);
+        }
+
+        let user: Option<IdOnly> = client
+            .send_optional(Request::get(format!("users/{login}")))
+            .await?;
+
+        let id = user
+            .ok_or_else(|| GitHubError::UnresolvedActor {
+                kind: "user",
+                slug: login.to_string(),
+            })?
+            .id;
+
+        self.users.lock().await.insert(login.to_string(), id);
+        Ok(id)
+    }
+
     /// How many lookups are cached, for tests.
     #[cfg(test)]
     pub(crate) async fn cached(&self) -> usize {
-        self.teams.lock().await.len() + self.apps.lock().await.len()
+        self.teams.lock().await.len() + self.apps.lock().await.len() + self.users.lock().await.len()
     }
 }
 
@@ -218,16 +243,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolves_a_user_to_its_identifier() {
+        let client = client(true);
+        let resolver = Resolver::new();
+
+        assert_eq!(resolver.user(&client, "octocat").await.unwrap(), 42);
+        assert_eq!(client.calls.lock().unwrap()[0], "users/octocat");
+    }
+
+    #[tokio::test]
+    async fn a_missing_user_names_the_login() {
+        let client = client(false);
+        let error = Resolver::new().user(&client, "nobody").await.unwrap_err();
+
+        assert!(matches!(
+            error,
+            GitHubError::UnresolvedActor { kind: "user", .. }
+        ));
+        assert!(error.to_string().contains("nobody"), "{error}");
+    }
+
+    #[tokio::test]
     async fn teams_and_apps_do_not_share_a_cache() {
         let client = client(true);
         let resolver = Resolver::new();
 
         resolver.team(&client, "acme", "same").await.unwrap();
         resolver.app(&client, "same").await.unwrap();
+        resolver.user(&client, "same").await.unwrap();
 
         let calls = client.calls.lock().unwrap();
-        assert_eq!(calls.len(), 2);
+        assert_eq!(calls.len(), 3);
         assert_eq!(calls[0], "orgs/acme/teams/same");
         assert_eq!(calls[1], "apps/same");
+        assert_eq!(calls[2], "users/same");
     }
 }
