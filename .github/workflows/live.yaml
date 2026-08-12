@@ -59,10 +59,10 @@ jobs:
           GH_TOKEN: ${{ secrets.LIVE_TEST_TOKEN }}
           GH_SETTINGS_TEST_REPO: ${{ vars.LIVE_TEST_REPO }}
 
-      # The suite cleans up after itself, but a cancelled or crashed run may
-      # not have got that far. Leaving a dirty repository would make the next
-      # run refuse to start, which is correct but unhelpful at 4am.
+      # Cleanup runs from a destructor, so an ordinary test failure now leaves
+      # nothing behind. A cancelled job, an OOM kill or the timeout below runs
+      # no destructor at all, which is the case this still covers.
       - name: Report leftovers
         if: failure()
         run: |
-          echo "::warning::The live suite failed. ${{ vars.LIVE_TEST_REPO }} may hold leftover configuration, which will make the next run refuse to start. Reset it with: scripts/live-sandbox.sh ${{ vars.LIVE_TEST_REPO }} --yes"
+          echo "::warning::The live suite failed. If the job was killed rather than failing a test, ${{ vars.LIVE_TEST_REPO }} may hold leftover configuration, which will make the next run refuse to start. Reset it with: scripts/live-sandbox.sh ${{ vars.LIVE_TEST_REPO }} --yes"

@@ -63,8 +63,6 @@ fn live_labels_create_update_and_prune() {
     live.run(&["sync", "--yes", "--only", "labels"])
         .expect_status(0);
     live.run(&["plan", "--only", "labels"]).expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -83,8 +81,6 @@ fn live_topics_are_normalised_the_way_github_normalises_them() {
     live.run(&["sync", "--yes", "--only", "topics"])
         .expect_status(0);
     live.run(&["plan", "--only", "topics"]).expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -115,8 +111,6 @@ fn live_autolinks_recreate_on_change() {
         .expect_status(0);
     live.run(&["plan", "--only", "autolinks"])
         .expect_up_to_date();
-
-    live.cleanup();
 }
 
 /// A ruleset with every `pull_request` parameter supplied.
@@ -157,8 +151,6 @@ fn live_rulesets_create_update_and_prune() {
         .expect_status(0);
     live.run(&["plan", "--only", "rulesets"])
         .expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -181,8 +173,6 @@ fn live_an_incomplete_rule_is_rejected() {
         output.stdout,
         output.stderr
     );
-
-    live.cleanup();
 }
 
 #[test]
@@ -199,8 +189,6 @@ fn live_repository_security_travels_in_its_own_request() {
         .expect_status(0);
     live.run(&["plan", "--only", "repository"])
         .expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -218,8 +206,6 @@ fn live_export_round_trips_to_an_empty_plan() {
     live.run(&["export", "--force"]).expect_status(0);
     live.run(&["validate"]).expect_status(0);
     live.run(&["plan"]).expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -235,8 +221,6 @@ fn live_plan_never_writes() {
     live.run(&["plan", "--only", "labels"]).expect_status(2);
     // And nothing was created, so the same plan is still pending.
     live.run(&["plan", "--only", "labels"]).expect_status(2);
-
-    live.cleanup();
 }
 
 #[test]
@@ -307,8 +291,6 @@ fn live_environments_carry_their_protection_rules() {
         .expect_status(0);
     live.run(&["plan", "--only", "environments"])
         .expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -342,8 +324,6 @@ fn live_variables_at_both_scopes() {
     ));
     live.run(&["plan", "--only", "variables"])
         .expect_up_to_date();
-
-    live.cleanup();
 }
 
 #[test]
@@ -378,8 +358,6 @@ fn live_pages_enable_and_update() {
     live.run(&["sync", "--yes", "--only", "pages"])
         .expect_status(0);
     live.run(&["plan", "--only", "pages"]).expect_up_to_date();
-
-    live.cleanup();
 }
 
 /// A permission GitHub named, in the spelling our declarations use.
@@ -531,8 +509,6 @@ fn live_declared_permissions_match_what_github_accepts() {
             ));
         }
     }
-
-    live.cleanup();
 
     assert!(
         failures.is_empty(),

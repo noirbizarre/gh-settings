@@ -22,7 +22,10 @@
 //! * the repository must be free of managed configuration before they start.
 //!   A suite that can eat someone's real settings is not worth having, so this
 //!   is checked, not assumed;
-//! * each test cleans up after itself.
+//! * cleanup runs from `Drop`, so it happens whether the test passed or
+//!   panicked. Relying on a call at the end of each test body meant the one
+//!   case that leaves a mess — a failed assertion — was the one case that
+//!   skipped it.
 //!
 //! The sandbox is yours, not CI's: a repository shared by two actors does not
 //! interleave, it makes the second pre-flight refuse (ADR-019). Build one, and
@@ -220,6 +223,15 @@ impl Live {
 
     /// Run the binary against the real repository.
     pub fn run(&self, args: &[&str]) -> Output {
+        self.try_run(args).expect("run gh-settings")
+    }
+
+    /// Run the binary, returning `None` if it could not be started.
+    ///
+    /// Cleanup runs from `Drop`, so it may run while a panic is unwinding, and
+    /// a panic during a panic aborts the process — replacing a readable test
+    /// failure with a bare signal. Hence a fallible variant.
+    fn try_run(&self, args: &[&str]) -> Option<Output> {
         let mut command = Command::new(env!("CARGO_BIN_EXE_gh-settings"));
         command
             .args(args)
@@ -230,12 +242,12 @@ impl Live {
             .env_remove("GH_SETTINGS_CONFIG")
             .env_remove("RUST_LOG");
 
-        let output = command.output().expect("run gh-settings");
-        Output {
+        let output = command.output().ok()?;
+        Some(Output {
             status: output.status.code().unwrap_or(-1),
             stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
             stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        }
+        })
     }
 
     /// Call `gh api` directly, for setup and teardown.
@@ -304,19 +316,26 @@ impl Live {
 
     /// Remove everything the suite may have created.
     ///
-    /// Best effort and idempotent: a failed run must leave the repository
-    /// recoverable by simply running again.
+    /// Runs from [`Drop`], so it runs whether the test passed or panicked —
+    /// which is the point. A test that fails half way through is exactly the
+    /// one that leaves the repository dirty, and it used to be the one case
+    /// where cleanup was skipped.
+    ///
+    /// Best effort and idempotent throughout: a failed run must leave the
+    /// repository recoverable by simply running again, and nothing here may
+    /// panic (see [`Self::try_run`]).
     ///
     /// Note this cannot be an empty configuration file. "Absent means
     /// unmanaged" is the tool's central safety rule, so an empty file prunes
     /// *nothing* — it has to name each section explicitly with `prune: true`
     /// and no items.
-    ///
-    /// Only the prunable collections are here. Pages and the repository fields
-    /// have no `prune`, and the pre-flight does not look at them either, so
-    /// their residue is cleared by `scripts/live-sandbox.sh` instead.
-    pub fn cleanup(&self) {
+    fn cleanup(&self) {
+        // `description` and `homepage` are `Nullable`, so an explicit `null`
+        // means "set it to null" while omitting them would mean "leave them
+        // alone". That distinction is what lets this file reset the repository
+        // without claiming anything about the settings it does not name.
         let purge = "version: 1\n\
+             repository:\n  description: null\n  homepage: null\n\
              labels:\n  prune: true\n  items: []\n\
              topics:\n  prune: true\n  items: []\n\
              autolinks:\n  prune: true\n  items: []\n\
@@ -324,18 +343,44 @@ impl Live {
              variables:\n  prune: true\n  items: []\n\
              environments:\n  prune: true\n  items: []\n";
 
-        self.config(purge);
-        let output = self.run(&["sync", "--yes", "--prune"]);
+        if let Err(error) = std::fs::write(self.dir.path().join(".github/settings.yml"), purge) {
+            eprintln!(
+                "cleanup of {} could not write its config: {error}",
+                self.repo
+            );
+            return;
+        }
 
-        if output.status != 0 {
+        match self.try_run(&["sync", "--yes", "--prune"]) {
             // Not fatal — the next run's pre-flight will refuse rather than
             // silently operating on a dirty repository — but say so, because
             // the reason will not be obvious tomorrow morning.
-            eprintln!(
+            Some(output) if output.status != 0 => eprintln!(
                 "cleanup of {} did not fully succeed (exit {}):\n{}\n{}",
                 self.repo, output.status, output.stdout, output.stderr
-            );
+            ),
+            None => eprintln!("cleanup of {} could not run the binary", self.repo),
+            Some(_) => {}
         }
+
+        // Pages has no `prune` — the configuration format describes a site that
+        // exists, never its absence — so it cannot go through the tool at all.
+        //
+        // The attempt usually fails, and that is expected rather than a
+        // problem: on a public repository GitHub ties the site to the
+        // `gh-pages` branch and answers 422 for as long as it exists, which on
+        // a sandbox is always, because `live_pages_enable_and_update` needs
+        // that branch. It is attempted anyway for sandboxes without one.
+        let _ = Command::new("gh")
+            .args(["api", &format!("repos/{}/pages", self.repo)])
+            .args(["--method", "DELETE", "--silent"])
+            .output();
+    }
+}
+
+impl Drop for Live {
+    fn drop(&mut self) {
+        self.cleanup();
     }
 }
 

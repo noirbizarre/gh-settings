@@ -114,16 +114,21 @@ the suite is for. To keep the variable across shells, put it in
 GH_SETTINGS_TEST_REPO = "you/gh-settings-sandbox"
 ```
 
-Each test cleans up after itself, but a cancelled or crashed run may not get
-that far, and the next run will then refuse to start:
+Each test cleans up after itself from a destructor, so a failing test leaves the
+sandbox as it found it. A run that is *killed* — cancelled, timed out, OOM —
+runs no destructor, and the next run will then refuse to start:
 
 ```
 refusing to run the live suite: you/sandbox already has rulesets
 ```
 
 That is the safety check working, not a bug. `mise run test:live:setup --yes`
-resets the sandbox — it goes wider than the tests' own cleanup, which does not
-cover Pages or the repository fields.
+resets the sandbox — it goes wider than the tests' own cleanup, and it reports
+what it could not reset rather than stopping at the first refusal.
+
+Pages is the one thing neither can remove. On a public repository GitHub ties
+the site to the `gh-pages` branch and refuses to deactivate it while that branch
+exists — and the sandbox needs the branch, so a Pages site there is expected.
 
 One test, `live_declared_permissions_match_what_github_accepts`, asks GitHub
 what permissions each endpoint really requires and checks our declarations
