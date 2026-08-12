@@ -45,7 +45,7 @@ inputs:
     default: "false"
   version:
     description: |
-      Version of the extension to install, e.g. `0.1.0`.
+      Version of the extension to install, e.g. `1.2.3`.
       Defaults to the latest release. Pin it for reproducible workflows.
     default: latest
   summary:

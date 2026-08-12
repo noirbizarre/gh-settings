@@ -4,10 +4,17 @@ The action installs the extension and runs it, so automating this does not mean
 hand-writing `gh extension install` in every repository.
 
 ```yaml
-- uses: noirbizarre/gh-settings@v1
+- uses: noirbizarre/gh-settings@main
   with:
     token: ${{ secrets.GH_SETTINGS_TOKEN }}
 ```
+
+!!! note "Why `@main`"
+
+    The action has not been in a release yet, so there is no tag to pin to.
+    `@v1` appears in most Actions documentation and will work here too, from the
+    first 1.x release onwards — a floating alias is published with each one.
+    Until then `@main` is the only ref that resolves.
 
 !!! warning "The default token is not enough"
 
@@ -36,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: noirbizarre/gh-settings@v1
+      - uses: noirbizarre/gh-settings@main
         with:
           token: ${{ secrets.GH_SETTINGS_TOKEN }}
 ```
@@ -48,7 +55,7 @@ turns that into the `changed` output rather than a failed job, so drift is
 something you can branch on.
 
 ```yaml
-      - uses: noirbizarre/gh-settings@v1
+      - uses: noirbizarre/gh-settings@main
         id: settings
         with:
           command: plan
@@ -74,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: noirbizarre/gh-settings@v1
+      - uses: noirbizarre/gh-settings@main
         with:
           command: validate
 ```
@@ -89,7 +96,7 @@ managing a secret:
       issues: write
     steps:
       - uses: actions/checkout@v5
-      - uses: noirbizarre/gh-settings@v1
+      - uses: noirbizarre/gh-settings@main
         with:
           only: labels
 ```
@@ -97,7 +104,7 @@ managing a secret:
 ## Diagnosing a token
 
 ```yaml
-      - uses: noirbizarre/gh-settings@v1
+      - uses: noirbizarre/gh-settings@main
         with:
           command: doctor
           token: ${{ secrets.GH_SETTINGS_TOKEN }}
@@ -120,7 +127,7 @@ cannot tell — a fine-grained token does not report its scopes.
 | `prune` |  | Delete items present on GitHub but absent from the configuration. Overrides the file in both directions; leave unset to honour it. |
 | `dry_run` | `false` | Show what sync would do without changing anything. |
 | `verbose` | `false` | Include field-level detail in the plan and the job summary. |
-| `version` | `latest` | Version of the extension to install, e.g. `0.1.0`. Defaults to the latest release. Pin it for reproducible workflows. |
+| `version` | `latest` | Version of the extension to install, e.g. `1.2.3`. Defaults to the latest release. Pin it for reproducible workflows. |
 | `summary` | `true` | Write the plan to the job summary. |
 
 <!-- /generated -->
@@ -136,10 +143,16 @@ cannot tell — a fine-grained token does not report its scopes.
 
 ## Pinning
 
+Two things are pinned separately: the action, through `uses:`, and the extension
+it installs, through `version`.
+
 `version` defaults to the latest release. Pin it for reproducible workflows:
 
 ```yaml
-      - uses: noirbizarre/gh-settings@v1
+      - uses: noirbizarre/gh-settings@main
         with:
-          version: "0.1.0"
+          version: "1.2.3"
 ```
+
+Pin the action itself to a floating major (`@v1`) once one exists, or to a
+commit SHA if you want the action's own behaviour frozen as well.

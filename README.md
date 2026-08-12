@@ -268,7 +268,7 @@ In a workflow, use the action rather than wiring up the CLI by hand:
 
 ```yaml
 - uses: actions/checkout@v5
-- uses: noirbizarre/gh-settings@v1
+- uses: noirbizarre/gh-settings@main
   with:
     token: ${{ secrets.GH_SETTINGS_TOKEN }}   # NOT secrets.GITHUB_TOKEN
 ```

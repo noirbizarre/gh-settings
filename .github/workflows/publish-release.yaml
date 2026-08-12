@@ -144,3 +144,28 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: gh release upload "$TAG" dist/* --clobber
+
+      # `uses: noirbizarre/gh-settings@v1` needs a ref that exists. The releases
+      # themselves are tagged without a `v` prefix, which is this project's
+      # convention and stays that way — but a workflow `uses:` clause is not
+      # ours to name, and the Actions ecosystem universally pins `@vN`. So the
+      # alias carries the prefix even though the release tags do not.
+      #
+      # It floats: every 1.x release moves it, which is the whole point of
+      # pinning to a major. Nothing is moved before the assets are uploaded, so
+      # the alias never points at a release that cannot be installed.
+      - name: Move the floating major alias
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          major="${TAG%%.*}"
+
+          # No `v0`. A 0.x major promises nothing, so an alias pinning to it
+          # would offer stability the version number explicitly withholds.
+          if [ "$major" = "0" ]; then
+            echo "0.x: no floating alias, the major carries no compatibility promise"
+            exit 0
+          fi
+
+          git tag -f "v${major}" "$TAG"
+          git push --force origin "v${major}"
