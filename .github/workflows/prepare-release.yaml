@@ -1,16 +1,8 @@
 name: 🚀 Prepare Release
 
-# gh-ship finds the run it dispatched by looking for this nonce.
-# See https://noirbizarre.github.io/gh-ship/workflows/
-run-name: 🚀 Prepare Release (ship:${{ inputs.ship_id }})
-
 on:
   workflow_dispatch:
     inputs:
-      ship_id:
-        description: gh-ship correlation nonce
-        required: true
-        type: string
       dry_run:
         description: Produce the artifact but do not commit or push
         required: false
@@ -19,9 +11,6 @@ on:
 
   workflow_call:
     inputs:
-      ship_id:
-        required: true
-        type: string
       dry_run:
         required: false
         type: boolean
@@ -33,18 +22,30 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    # An App installation token expires after one hour, and this job outliving
+    # its own credentials would fail at whichever call came after it.
+    timeout-minutes: 30
 
-    # SHIP_TOKEN lives only in the `release` environment.
+    # The App credentials live only in the `release` environment.
     # Preparing a release is not a deployment, so this gates secrets and reviews without registering one.
     # The deployment is publish-release.
+    #
+    # Load-bearing twice over: an environment *variable* resolves only in a job
+    # declaring its environment, so without this `vars.APP_CLIENT_ID` would
+    # silently expand to the empty string.
     environment:
       name: release
       deployment: false
 
-    env:
-      GITHUB_TOKEN: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
-
     steps:
+      # An installation token, minted for this job and revoked when it ends.
+      # The private key never leaves the secret.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v7
         with:
           # Full history *and* tags: git-cliff derives the next version from
@@ -53,7 +54,7 @@ jobs:
           fetch-tags: true
           # The default GITHUB_TOKEN cannot trigger workflows, so a Release PR
           # it authors would show no CI results.
-          token: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -130,10 +131,22 @@ jobs:
         if: steps.version.outputs.changed == 'true'
         run: cargo run --quiet -- schema > schema/v1/settings.json
 
+      # Installed before the commit, not after: both `gh ship sign` below and
+      # the artifact validation at the end need it.
+      - name: Install gh-ship
+        run: gh extension install noirbizarre/gh-ship
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
       - name: Commit and push
         if: steps.version.outputs.changed == 'true' && !inputs.dry_run
         run: |
           set -euo pipefail
+          # Runners carry no git identity, and `git commit` refuses without
+          # one. This identity is throwaway: the commit made here is replaced
+          # by the signed one below, whose author and committer come from the
+          # token instead — GitHub only signs a commit it is asked to create
+          # with no identity of its own.
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -141,6 +154,25 @@ jobs:
           git diff --cached --quiet || \
             git commit -m "chore(release): ${{ steps.version.outputs.version }}"
           git push origin HEAD
+
+      # A commit made on the runner is never signed, whatever token pushes it:
+      # git signs with a key and there is no key here, while the token only
+      # authenticates the push. `gh ship sign` re-creates the tip through the
+      # API carrying no author, committer or signature — the only shape GitHub
+      # will sign itself — and moves the branch onto the result. It exits
+      # non-zero rather than leaving a silently unsigned commit behind.
+      #
+      # With no argument it signs the tip of the branch this run was dispatched
+      # on, which is gh-ship's throwaway staging branch. The condition must
+      # match the commit step exactly: signing a tip this run did not create
+      # would re-create somebody else's commit.
+      #
+      # https://noirbizarre.github.io/gh-ship/workflows/#getting-a-verified-release-commit
+      - name: Sign the release commit
+        if: steps.version.outputs.changed == 'true' && !inputs.dry_run
+        run: gh ship sign
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       # --- the protocol ------------------------------------------------------
 
@@ -166,9 +198,9 @@ jobs:
           cat ship.release.json
 
       - name: Validate the release artifact
-        run: |
-          gh extension install noirbizarre/gh-ship
-          gh ship validate ship.release.json
+        run: gh ship validate ship.release.json
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - uses: actions/upload-artifact@v7
         with:

@@ -1,14 +1,8 @@
 name: 📦 Publish Release
 
-run-name: 📦 Publish Release (ship:${{ inputs.ship_id }})
-
 on:
   workflow_dispatch:
     inputs:
-      ship_id:
-        description: gh-ship correlation nonce
-        required: true
-        type: string
       tag:
         description: The tag being released
         required: true
@@ -16,9 +10,6 @@ on:
 
   workflow_call:
     inputs:
-      ship_id:
-        required: true
-        type: string
       tag:
         required: true
         type: string
@@ -111,8 +102,12 @@ jobs:
       name: release
       url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag }}
 
+    # This job neither dispatches workflows nor pushes commits that must
+    # trigger CI, so the default token is enough. The release credentials —
+    # the GitHub App minted in 🚢 Ship and 🚀 Prepare Release — are not
+    # needed here, and not asking for them keeps this job least-privileged.
     env:
-      GITHUB_TOKEN: ${{ secrets.SHIP_TOKEN || secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
 
     steps:
       - uses: actions/checkout@v7

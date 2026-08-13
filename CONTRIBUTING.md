@@ -176,3 +176,10 @@ The lifecycle is:
 Maintainers do not tag by hand. `gh ship validate` runs in CI, so a workflow
 that stops satisfying the contract fails on a pull request rather than
 mid-release. See [ADR-014](docs/adr/014-releases.md).
+
+The release credentials are a GitHub App, installed on the repository and
+holding its Client ID and private key in the `release` environment. Each job
+mints a short-lived installation token and the version bump is re-created
+through the API so GitHub signs it — which is why the release commit is
+**Verified**, authored by the App's bot and committed by `GitHub`. See
+[ADR-022](docs/adr/022-signed-release-commits.md).

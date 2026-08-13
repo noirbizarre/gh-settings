@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://noirbizarre.github.io/gh-ship/schema/config/v1.json
+# $schema: https://noirbizarre.github.io/gh-ship/schema/config/v1.json
 # gh-ship configuration
 # Docs: https://noirbizarre.github.io/gh-ship/configuration/
 #
@@ -16,7 +16,12 @@ workflows:
   publish: publish-release
 
 pull_request:
-  title: "Release {{ version }}"
+  # The Release PR is squash-merged, and GitHub composes the squash commit from
+  # this title. This repository lints its own commit messages with
+  # commitlint/config-conventional, so the title has to be a Conventional
+  # Commit — `Release 0.3.0` is a subject our own hooks reject. `cliff.toml`
+  # skips `^chore\(release\):`, so it never reappears in the next changelog.
+  title: "chore(release): {{ version }}"
   header: |
     This PR prepares the next release of gh-settings.
 
@@ -26,6 +31,10 @@ pull_request:
     ---
     Generated automatically by [gh-ship](https://github.com/noirbizarre/gh-ship).
   labels: [release]
+  # The default, stated because it is load-bearing: one pull request per
+  # release for its whole life, so its number, comments and review state
+  # survive every re-prepare.
+  reuse: true
 
 release:
   # Draft first, so the publish workflow can attach the binaries before anyone
