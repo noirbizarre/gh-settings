@@ -5,6 +5,11 @@
 # use identical tool versions — CI drives the tools directly rather than
 # through the tasks defined below.
 #
+# Tools no CI job needs are declared on their own task rather than in `[tools]`,
+# because `mise install` — what CI runs — installs `[tools]` only. It matters
+# here: cargo-binstall has no prebuilt artifact for resvg, usvg or cargo-insta,
+# so a global entry made every CI job compile all three from source.
+#
 # Rust itself is intentionally not managed here: CI needs per-job components
 # (rustfmt, clippy, llvm-tools-preview) and cross-compilation targets, which
 # `dtolnay/rust-toolchain` handles better. `rust-toolchain.toml` pins the
@@ -33,13 +38,8 @@ git-cliff = "latest"
 cargo-binstall = "latest"
 "cargo:cargo-nextest" = "latest"
 "cargo:cargo-llvm-cov" = "latest"
-"cargo:cargo-insta" = "latest"
-# Rasterizes the SVG assets (see the `icons` and `social` tasks). Pure Rust, so
-# it needs no system libraries and renders identically on every platform.
-"cargo:resvg" = "latest"
-# Flattens the wordmark <text> in logo.src.svg into paths (see the `logo`
-# task), so the logo needs no font installed wherever it is displayed.
-"cargo:usvg" = "latest"
+# cargo-insta, resvg and usvg are declared on the tasks that use them instead of
+# here — see the note in the header.
 
 # --- Everyday ---------------------------------------------------------------
 
@@ -96,6 +96,7 @@ run = "actionlint .github/workflows/*.yaml"
 
 [tasks.snapshots]
 description = "Review and update insta snapshots interactively"
+tools = { "cargo:cargo-insta" = "latest" }
 run = "cargo insta review"
 
 # --- gh-settings itself -----------------------------------------------------
@@ -170,6 +171,7 @@ description = "Rebuild docs/images/logo.svg from logo.src.svg"
 # GitHub, on the documentation site and in the social card. usvg converts it to
 # paths once, here, between the two fixups gen-logo.py exists for: inlining the
 # mark, and restoring the viewBox usvg drops. Both are explained in that file.
+tools = { "cargo:usvg" = "latest" }
 run = """
 python3 scripts/gen-logo.py inline docs/images/logo.src.svg \
   | usvg --font-family "Fira Sans" - -c \
@@ -179,6 +181,9 @@ echo "docs/images/logo.svg"
 
 [tasks.icons]
 description = "Rasterize docs/images/icon.svg into the PNG sizes"
+# resvg is pure Rust, so it needs no system libraries and renders identically on
+# every platform.
+tools = { "cargo:resvg" = "latest" }
 run = """
 for size in 128 256 512; do
   resvg --width "$size" --height "$size" docs/images/icon.svg "docs/images/icon-$size.png"
@@ -196,6 +201,7 @@ description = "Render the GitHub social preview image from the logo"
 # resvg scales to fit rather than padding, so --width 1280 --height 640 on a
 # wide logo yields 1280x299, not GitHub's required 1280x640. The wrapper
 # references logo.svg instead of copying it, so the two cannot drift.
+tools = { "cargo:resvg" = "latest" }
 run = """
 resvg docs/images/social-preview.svg docs/images/social-preview.png
 echo "docs/images/social-preview.png — upload under Settings > General > Social preview"

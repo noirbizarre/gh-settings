@@ -79,7 +79,7 @@ url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.12.3/ca
 url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/243936407"
 
 [[tools."cargo:cargo-insta"]]
-version = "1.43.0"
+version = "1.48.0"
 backend = "cargo:cargo-insta"
 
 [[tools."cargo:cargo-llvm-cov"]]
