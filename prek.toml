@@ -25,16 +25,13 @@ additional_dependencies = ["@commitlint/config-conventional"]
 [[repos]]
 repo = "local"
 
-# actionlint 1.7.7 does not yet know `environment.deployment`, a documented and
-# supported key:
-# https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments
-# Only that rule is suppressed; other unexpected keys are still reported.
-# Remove the -ignore once actionlint ships support.
+# Suppressions are configured in .github/actionlint.yml, not here: the same
+# file serves `mise run lint:actions`, so the two cannot disagree.
 [[repos.hooks]]
 id = "actionlint"
 name = "actionlint"
 language = "system"
-entry = "actionlint -ignore 'unexpected key \"deployment\" for \"environment\" section'"
+entry = "actionlint"
 files = "^\\.github/workflows/.*\\.ya?ml$"
 
 [[repos.hooks]]

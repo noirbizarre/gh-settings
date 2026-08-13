@@ -90,14 +90,9 @@ run = "typos"
 
 [tasks."lint:actions"]
 description = "Lint the GitHub Actions workflows"
-# actionlint 1.7.7 does not yet know `environment.deployment`, which is a
-# documented, supported key:
-# https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments
-# Suppress that one rule only — every other unexpected key is still caught.
-# Drop the -ignore once actionlint ships support.
-run = """
-actionlint -ignore 'unexpected key "deployment" for "environment" section' .github/workflows/*.yaml
-"""
+# Rule suppressions live in .github/actionlint.yml, which actionlint picks up
+# on its own — so this task and the prek hook cannot drift apart.
+run = "actionlint .github/workflows/*.yaml"
 
 [tasks.snapshots]
 description = "Review and update insta snapshots interactively"

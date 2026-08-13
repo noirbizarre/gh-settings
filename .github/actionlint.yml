@@ -1,0 +1,25 @@
+# actionlint configuration.
+# Docs: https://github.com/rhysd/actionlint/blob/main/docs/config.md
+#
+# Every entry here suppresses a rule actionlint gets wrong, not a rule we
+# disagree with. Each says which version was current when it was added, so a
+# later upgrade can retire it. Nothing else is silenced: an unexpected key we
+# did not anticipate is still an error.
+
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      # `environment.deployment` is documented and supported, but actionlint
+      # 1.7.12 does not know the key:
+      # https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments
+      # Only `deployment` is allowed through — any other unexpected key under
+      # `environment` is still reported.
+      - 'unexpected key "deployment" for "environment" section'
+
+      # actionlint 1.7.12 bundles metadata for
+      # `actions/create-github-app-token` that predates `client-id`: it demands
+      # the legacy numeric `app-id` and rejects the input the action itself now
+      # recommends. Both halves of that one mistake, scoped to this action so a
+      # genuinely missing input elsewhere still fails.
+      - 'missing input "app-id" which is required by action "actions/create-github-app-token'
+      - 'input "client-id" is not defined in action "actions/create-github-app-token'
