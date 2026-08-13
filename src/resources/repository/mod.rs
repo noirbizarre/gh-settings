@@ -53,6 +53,9 @@ pub struct Current {
     /// Whether this is a template repository.
     #[serde(default)]
     pub is_template: bool,
+    /// Whether web-based commits must be signed off.
+    #[serde(default)]
+    pub web_commit_signoff_required: bool,
     /// Whether merge commits are allowed.
     #[serde(default)]
     pub allow_merge_commit: bool,
@@ -228,7 +231,7 @@ impl Resource for Repository {
         }
 
         // Plain booleans.
-        let booleans: [(&str, Option<bool>, bool); 12] = [
+        let booleans: [(&str, Option<bool>, bool); 13] = [
             ("private", desired.private, current.private),
             ("has_issues", desired.has_issues, current.has_issues),
             ("has_wiki", desired.has_wiki, current.has_wiki),
@@ -239,6 +242,11 @@ impl Resource for Repository {
                 current.has_discussions,
             ),
             ("is_template", desired.is_template, current.is_template),
+            (
+                "web_commit_signoff_required",
+                desired.web_commit_signoff_required,
+                current.web_commit_signoff_required,
+            ),
             (
                 "allow_merge_commit",
                 desired.allow_merge_commit,
@@ -469,6 +477,7 @@ impl Resource for Repository {
             has_projects: Some(current.has_projects),
             has_discussions: Some(current.has_discussions),
             is_template: Some(current.is_template),
+            web_commit_signoff_required: Some(current.web_commit_signoff_required),
             allow_merge_commit: Some(current.allow_merge_commit),
             allow_squash_merge: Some(current.allow_squash_merge),
             allow_rebase_merge: Some(current.allow_rebase_merge),

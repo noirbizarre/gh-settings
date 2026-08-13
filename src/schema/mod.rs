@@ -110,6 +110,7 @@ mod tests {
             "environments",
             "variables",
             "pages",
+            "actions",
         ] {
             assert!(properties.contains_key(section), "{section} is missing");
         }

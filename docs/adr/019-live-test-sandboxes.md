@@ -51,7 +51,16 @@ not a race but a refusal, at 4am, in a job nobody is watching.
   resource the live suite was written for.
 * The reset script must cover more than `Live::cleanup()` does. Cleanup is the
   per-test contract and only purges what the configuration format can prune;
-  Pages and the repository fields survive it, invisible to the pre-flight.
+  Pages, the repository fields and the Actions settings survive it, invisible to
+  the pre-flight.
+* The sandbox must also be *restored* to public, not merely checked. The Actions
+  settings behind `/access` and `/fork-pr-workflows-private-repos` exist only on
+  a private repository ([ADR-021](021-actions-settings.md)), so the live suite
+  flips the sandbox to private and back from a drop guard. A process killed
+  outright never runs that guard, and a sandbox stuck private is a sandbox on
+  which the rulesets tests cannot run. `scripts/live-sandbox.sh` therefore
+  repairs the visibility rather than reporting it — repairing a stuck sandbox is
+  what the script is for.
 * Nothing enforces the ownership rule mechanically. Pointing the variable at a
   repository that matters will still eat it — which is why the pre-flight
   refuses anything that looks lived-in.

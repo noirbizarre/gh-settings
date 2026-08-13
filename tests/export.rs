@@ -423,3 +423,89 @@ fn a_site_without_a_custom_domain_exports_no_cname() {
     );
     assert!(!output.stdout.contains("cname"), "{}", output.stdout);
 }
+
+// --- actions ----------------------------------------------------------------
+
+#[test]
+fn export_omits_actions_settings_the_repository_does_not_expose() {
+    // A public repository 404s on `/access` and
+    // `/fork-pr-workflows-private-repos`. Exporting them would put keys in the
+    // file that the repository cannot accept back.
+    let runner = Sandbox::new()
+        .repository(&default_repository())
+        .no_pages()
+        .no_actions()
+        .actions(
+            "",
+            r#"{"enabled": true, "allowed_actions": "all", "sha_pinning_required": false}"#,
+        )
+        .actions(
+            "artifact-and-log-retention",
+            r#"{"days": 90, "maximum_allowed_days": 400}"#,
+        )
+        .build();
+
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+
+    assert!(output.stdout.contains("actions:"), "{}", output.stdout);
+    assert!(
+        output
+            .stdout
+            .contains("artifact_and_log_retention_days: 90"),
+        "{}",
+        output.stdout
+    );
+    assert!(!output.stdout.contains("access_level"), "{}", output.stdout);
+    assert!(
+        !output.stdout.contains("fork_pr_workflows_private_repos"),
+        "{}",
+        output.stdout
+    );
+    // The ceiling describes the plan, not this repository, and is not a body
+    // parameter of the PUT.
+    assert!(
+        !output.stdout.contains("maximum_allowed_days"),
+        "{}",
+        output.stdout
+    );
+}
+
+#[test]
+fn an_exported_actions_section_plans_nothing() {
+    // The real test of normalisation: whatever `export` writes must diff to
+    // nothing against the state it was read from.
+    let sandbox = || {
+        Sandbox::new()
+            .repository(&default_repository())
+            .no_pages()
+            .no_actions()
+            .actions(
+                "",
+                r#"{"enabled": true, "allowed_actions": "SELECTED", "sha_pinning_required": false}"#,
+            )
+            .actions(
+                "selected-actions",
+                r#"{"github_owned_allowed": true, "verified_allowed": false,
+                    "patterns_allowed": ["docker/*", "actions/checkout@v4"]}"#,
+            )
+            .actions(
+                "workflow",
+                r#"{"default_workflow_permissions": "read", "can_approve_pull_request_reviews": false}"#,
+            )
+    };
+
+    let runner = sandbox().build();
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+
+    let exported = output.stdout;
+    let runner = sandbox().config(&exported).build();
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(0);
+    assert!(
+        output.stdout.contains("up to date"),
+        "exported configuration did not round trip\n{exported}\n{}",
+        output.stdout
+    );
+}

@@ -13,6 +13,7 @@
 pub mod change;
 pub mod requirement;
 
+pub mod actions;
 pub mod autolinks;
 pub mod environments;
 pub mod labels;
@@ -51,6 +52,8 @@ pub enum ResourceId {
     Rulesets,
     /// Deployment environments and their protection rules.
     Environments,
+    /// GitHub Actions general settings.
+    Actions,
     /// Actions variables, at repository and environment scope.
     Variables,
     /// GitHub Pages.
@@ -66,6 +69,7 @@ impl ResourceId {
         Self::Autolinks,
         Self::Rulesets,
         Self::Environments,
+        Self::Actions,
         Self::Variables,
         Self::Pages,
     ];
@@ -79,6 +83,7 @@ impl ResourceId {
             Self::Autolinks => "autolinks",
             Self::Rulesets => "rulesets",
             Self::Environments => "environments",
+            Self::Actions => "actions",
             Self::Variables => "variables",
             Self::Pages => "pages",
         }
@@ -93,6 +98,7 @@ impl ResourceId {
             Self::Autolinks => "Autolinks",
             Self::Rulesets => "Rulesets",
             Self::Environments => "Environments",
+            Self::Actions => "Actions",
             Self::Variables => "Variables",
             Self::Pages => "Pages",
         }

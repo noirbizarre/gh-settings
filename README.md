@@ -165,6 +165,7 @@ repository:
   allow_squash_merge: true
   allow_merge_commit: false
   delete_branch_on_merge: true
+  web_commit_signoff_required: true
   security:
     secret_scanning: true
     secret_scanning_push_protection: true
@@ -218,6 +219,19 @@ environments:
 variables:
   - name: DEFAULT_REGION
     value: eu-west-1
+
+actions:
+  enabled: true
+  allowed_actions: selected
+  selected_actions:
+    github_owned_allowed: true
+    verified_allowed: false
+    patterns_allowed:
+      - docker/*
+  default_workflow_permissions: read
+  can_approve_pull_request_reviews: false
+  artifact_and_log_retention_days: 30
+  fork_pr_contributor_approval: first_time_contributors
 
 pages:
   build_type: legacy
@@ -367,12 +381,19 @@ rather than a guess.
 | Rulesets | ✅ |
 | Environments (protection rules, reviewers, branch policies) | ✅ |
 | Actions variables, at repository and environment scope | ✅ |
+| Actions general settings (permissions, retention, fork PR approval) | ✅ |
 | GitHub Pages (source, custom domain, HTTPS) | ✅ |
 | Inheritance from a shared repository (`extends:`) | ✅ |
 
 Declaring a `pages:` section enables Pages; it is never turned back off, because
 an absent section means unmanaged and a published site should not come down over
 a missing key.
+
+Two toggles on the *General* settings page are knowingly **not** supported:
+*Allow users to comment on individual commits and pull request diffs* and
+*Automatically close issues with merged linked pull requests*. Neither has a
+field on `PATCH /repos`, and accepting one in the configuration would publish a
+setting that is silently ignored.
 
 Custom properties, webhooks and collaborators are planned; secrets are
 [deliberately out of scope](docs/adr/009-secrets-out-of-scope.md).

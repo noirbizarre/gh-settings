@@ -218,6 +218,39 @@ impl Requirement {
         github_token_note: None,
     };
 
+    /// GitHub Actions general settings.
+    ///
+    /// The older endpoints under `/repos/{o}/{r}/actions/permissions` are
+    /// documented as `Administration: write`, and the classic scope is `repo`.
+    ///
+    /// The endpoints GitHub added in 2025 — artifact and log retention, fork PR
+    /// contributor approval, private-repository fork PR workflows — document
+    /// something else: "the `repo` scope or the *Actions policies* fine-grained
+    /// permission". *Actions policies* has no entry in the published
+    /// fine-grained permissions table, and it is not the same thing as the
+    /// `Actions` permission [`VARIABLES`](Self::VARIABLES) already names. Rather
+    /// than pick whichever of the two we would rather be true, it is declared
+    /// [`unverified`](FineGrained::unverified): `doctor` then says *unknown*,
+    /// which is what we actually know. ADR-020 — these categories do not nest —
+    /// is precisely why the guess would be unsafe.
+    ///
+    /// `live_declared_permissions_match_what_github_accepts` reads
+    /// `X-Accepted-GitHub-Permissions` off each of the seven endpoints and will
+    /// settle it.
+    pub const ACTIONS: Requirement = Requirement {
+        fine_grained: &[
+            FineGrained::documented("Metadata", Access::Read),
+            FineGrained::documented("Administration", Access::Write),
+            FineGrained::unverified("Actions policies", Access::Write),
+        ],
+        classic: &["repo"],
+        github_token_capable: false,
+        // Byte-identical to ADMINISTRATION's, which the docs generator groups on.
+        github_token_note: Some(
+            "requires Administration: write, which cannot be granted to GITHUB_TOKEN",
+        ),
+    };
+
     /// What it takes to read a configuration inherited from another repository.
     /// Not a resource requirement: it is needed while *loading* the
     /// configuration, before any resource is consulted. Listed here because it
@@ -385,6 +418,7 @@ mod tests {
             &Requirement::VARIABLES,
             &Requirement::ENVIRONMENTS,
             &Requirement::PAGES,
+            &Requirement::ACTIONS,
         ] {
             assert!(
                 requirement
@@ -476,6 +510,11 @@ mod tests {
         // nothing is `Unverified` any more and the docs carry no footnote. A
         // new mapping that cannot be confirmed belongs here as an exception,
         // with a reason.
+        //
+        // `ACTIONS` is that exception. GitHub documents the 2025 Actions policy
+        // endpoints against an "Actions policies" permission that appears in no
+        // published table, and guessing which existing permission it is would be
+        // a claim we cannot support (ADR-020). It is asserted below instead.
         for requirement in [
             &Requirement::ADMINISTRATION,
             &Requirement::ISSUES,
@@ -490,6 +529,21 @@ mod tests {
                 requirement.fine_grained_summary()
             );
         }
+    }
+
+    #[test]
+    fn the_actions_policy_permission_is_declared_unverified() {
+        // Not an oversight: "Actions policies" is the name GitHub's own endpoint
+        // documentation uses, and it is in none of the published permission
+        // tables. `doctor` says "unknown" for it, which is the truth.
+        assert!(Requirement::ACTIONS.has_unverified());
+        assert!(
+            Requirement::ACTIONS
+                .fine_grained
+                .iter()
+                .any(|permission| permission.name == "Actions policies"
+                    && permission.confidence == Confidence::Unverified)
+        );
     }
 
     #[test]

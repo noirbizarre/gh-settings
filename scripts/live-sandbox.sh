@@ -84,9 +84,21 @@ fi
 # Rulesets answer `403 Upgrade to GitHub Pro` on a private repository on the
 # free plan, so a private sandbox silently loses the coverage the live suite
 # exists for. The pre-flight says the same thing; better to hear it here.
+#
+# A private sandbox is also how a crashed run leaves things:
+# `live_actions_private_only_settings_apply` flips the repository to private to
+# reach the endpoints that only exist there, and flips it back from a drop
+# guard. A process killed outright never runs that guard. So this repairs the
+# state rather than reporting it — repairing a stuck sandbox is what this
+# script is for.
 visibility="$(gh repo view "$repo" --json visibility --jq .visibility)"
 if [[ $visibility != PUBLIC ]]; then
-  die "$repo is $visibility. Rulesets need GitHub Pro on a private repository, so the sandbox must be public."
+  echo "$repo is $visibility; restoring it to public"
+  gh api "repos/$repo" --method PATCH --field private=false --silent ||
+    die "$repo is $visibility and could not be made public. Rulesets need GitHub Pro on a private repository, so the sandbox must be public."
+  visibility="$(gh repo view "$repo" --json visibility --jq .visibility)"
+  [[ $visibility == PUBLIC ]] ||
+    die "$repo is still $visibility after asking for public."
 fi
 
 # --- Seed -------------------------------------------------------------------
@@ -229,6 +241,45 @@ fi
 if try "clearing description and homepage" \
   gh api "repos/$repo" --method PATCH --field description= --field homepage= --silent; then
   echo "cleared description and homepage"
+fi
+
+# Actions settings have no `prune` — every one of them has a value, never an
+# existence — so neither `Live::cleanup()` nor the pre-flight can see them, and
+# a run that changed the allow list leaves the next one planning against it.
+# These are GitHub's defaults for a fresh repository.
+#
+# `selected-actions` is deliberately not reset: it is only reachable while the
+# policy is `selected`, and setting `allowed_actions=all` above has already made
+# GitHub ignore whatever it holds.
+if try "resetting Actions permissions" \
+  gh api "repos/$repo/actions/permissions" --method PUT \
+    --field enabled=true --field allowed_actions=all --silent; then
+  echo "reset Actions permissions"
+fi
+
+if try "resetting workflow permissions" \
+  gh api "repos/$repo/actions/permissions/workflow" --method PUT \
+    --field default_workflow_permissions=read \
+    --field can_approve_pull_request_reviews=false --silent; then
+  echo "reset workflow permissions"
+fi
+
+if try "resetting fork PR approval" \
+  gh api "repos/$repo/actions/permissions/fork-pr-contributor-approval" --method PUT \
+    --field approval_policy=first_time_contributors --silent; then
+  echo "reset fork PR approval"
+fi
+
+# Not reset to a fixed number: the default depends on the plan, and asking for
+# one GitHub refuses would report a failure that is not one. The ceiling it
+# reports is the default for a repository nobody has changed.
+retention="$(api "repos/$repo/actions/permissions/artifact-and-log-retention" --jq .maximum_allowed_days 2>/dev/null || true)"
+if [[ -n $retention && $retention != null ]]; then
+  if try "resetting artifact and log retention" \
+    gh api "repos/$repo/actions/permissions/artifact-and-log-retention" --method PUT \
+      --field days="$retention" --silent; then
+    echo "reset artifact and log retention to $retention days"
+  fi
 fi
 
 # --- Done -------------------------------------------------------------------

@@ -125,12 +125,13 @@ The App needs the repository permissions listed below.
 | Permission | Level | Needed for |
 |---|---|---|
 | **Metadata** | Read | Mandatory baseline for every fine-grained token |
-| **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets`, `environments`, and `pages` |
+| **Administration** | Read & write | `repository`, `topics`, `autolinks`, `rulesets`, `environments`, `actions`, and `pages` |
 | **Issues** | Read & write | `labels` — or `Pull requests`, either is accepted |
 | **Pages** | Read & write | `pages`, alongside `Administration: write` |
 | **Variables** | Read & write | `variables` at repository scope |
 | **Environments** | Read & write | `variables` nested under an environment; reading them back on `export` |
 | **Actions** | Read | Listing the repository's environments, which both `environments` and `variables` start from |
+| *Actions policies* | Read & write | `actions` — see the note below |
 | **Contents** | Read | Reading a base named in `extends:` — **on that repository**, not this one |
 | *Organization → Members* | Read | Resolving `bypass_actors: [{ team: … }]` and environment reviewers named by team (organisation repositories only) |
 
@@ -144,6 +145,15 @@ Every mapping in this table was confirmed against the
 `X-Accepted-GitHub-Permissions` response header, which GitHub sends to
 fine-grained tokens to say what an endpoint actually requires. The live suite
 re-checks them, so they cannot quietly drift.
+
+*Actions policies* is the exception, and it is italicised above for that reason.
+It is the name GitHub's documentation gives for the endpoints behind
+`actions` — artifact and log retention, fork pull request approval — and it
+appears in none of GitHub's published permission tables. It is **not** the same
+thing as the `Actions` permission listed above; ADR-020 applies. Until the live
+suite settles it, `doctor` reports **unknown** for it rather than claiming
+either way. In practice a classic token with `repo`, or a fine-grained token
+with `Administration: write`, has managed these settings in testing.
 
 Fine-grained tokens do not report their permissions through the API. `doctor`
 will therefore say **unknown** rather than guessing, and fall back to probing
@@ -180,11 +190,14 @@ actually enforces.
 | `autolinks` | Metadata: read, Administration: write | `repo` | ✘ |
 | `rulesets` | Metadata: read, Administration: write | `repo` | ✘ |
 | `environments` | Metadata: read, Actions: read, Environments: read, Administration: write | `repo` | ✘ |
+| `actions` | Metadata: read, Administration: write, Actions policies: write † | `repo` | ✘ |
 | `variables` | Metadata: read, Actions: read, Variables: write, Environments: write | `repo` | ✘ |
 | `pages` | Metadata: read, Pages: write, Administration: write | `repo` | ✔ |
 | `extends` | Contents: read | `repo` | ✘ |
 
-`repository`, `topics`, `autolinks`, `rulesets` and `environments` require Administration: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
+† GitHub's own reference does not settle this mapping — it is either absent or ambiguous there, so this is our best understanding and the minimal claim, not a guarantee. `gh settings doctor` will tell you what your token can actually do.
+
+`repository`, `topics`, `autolinks`, `rulesets`, `environments` and `actions` require Administration: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
 
 `variables` requires Variables: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
 

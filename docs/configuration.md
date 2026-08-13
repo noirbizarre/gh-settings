@@ -16,6 +16,51 @@ Add this line to get completion and validation in your editor:
 ```
 
 
+## `actions`
+
+GitHub Actions general settings.
+
+Everything on *Settings → Actions → General*: whether Actions runs, which
+actions are allowed, artifact retention, fork pull request approval and
+the default `GITHUB_TOKEN` permissions.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `access_level` | `none` \| `user` \| `organization` | no | How far outside this repository its actions and reusable workflows are visible. |
+| `allowed_actions` | `all` \| `local_only` \| `selected` | no | Which actions and reusable workflows are allowed to run. |
+| `artifact_and_log_retention_days` | integer | no | How many days artifacts and logs are kept. |
+| `can_approve_pull_request_reviews` | boolean | no | Whether workflows may approve pull requests. |
+| `default_workflow_permissions` | `read` \| `write` | no | Default permissions granted to `GITHUB_TOKEN` in a workflow run. |
+| `enabled` | boolean | no | Whether GitHub Actions runs on this repository at all. |
+| `fork_pr_contributor_approval` | `first_time_contributors_new_to_github` \| `first_time_contributors` \| `all_external_contributors` | no | Which fork pull requests need approval before their workflows run. |
+| `fork_pr_workflows_private_repos` | object | no | Fork pull request behaviour, on private repositories only. |
+| `selected_actions` | object | no | The allow list, meaningful only with `allowed_actions: selected`. |
+| `sha_pinning_required` | boolean | no | Whether actions must be referenced by a full-length commit SHA. |
+
+
+### `actions.fork_pr_workflows_private_repos`
+
+Fork pull request behaviour, on private repositories only.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `require_approval_for_fork_pr_workflows` | boolean | no | Whether those workflows need a maintainer's approval. |
+| `run_workflows_from_fork_pull_requests` | boolean | no | Whether fork pull requests may run workflows at all. |
+| `send_secrets_and_variables` | boolean | no | Whether those workflows can read secrets and variables. |
+| `send_write_tokens_to_workflows` | boolean | no | Whether those workflows receive a write-capable `GITHUB_TOKEN`. |
+
+
+### `actions.selected_actions`
+
+The allow list, meaningful only with `allowed_actions: selected`.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `github_owned_allowed` | boolean | no | Whether actions published by GitHub itself are allowed. |
+| `patterns_allowed` | list of string | no | Patterns naming further actions and reusable workflows to allow. |
+| `verified_allowed` | boolean | no | Whether actions by GitHub Marketplace verified creators are allowed. |
+
+
 ## `autolinks`
 
 Autolink references.
@@ -231,6 +276,7 @@ settings.
 | `squash_merge_commit_message` | `PR_BODY` \| `COMMIT_MESSAGES` \| `BLANK` | no | Default commit message for squash merges. |
 | `squash_merge_commit_title` | `PR_TITLE` \| `COMMIT_OR_PR_TITLE` | no | Default commit title for squash merges. |
 | `topics` | list of string | no | Topics. |
+| `web_commit_signoff_required` | boolean | no | Whether commits made through the web interface must be signed off. |
 
 
 ### `repository.security`

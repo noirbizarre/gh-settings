@@ -1614,3 +1614,195 @@ fn the_public_flag_is_never_sent_even_though_github_reports_it() {
         output.stderr
     );
 }
+
+/// A repository with Actions on and everything at GitHub's defaults.
+fn actions_defaults(sandbox: Sandbox) -> Sandbox {
+    sandbox
+        .actions(
+            "",
+            r#"{"enabled": true, "allowed_actions": "all", "sha_pinning_required": false}"#,
+        )
+        .actions(
+            "workflow",
+            r#"{"default_workflow_permissions": "read", "can_approve_pull_request_reviews": false}"#,
+        )
+        .actions(
+            "artifact-and-log-retention",
+            r#"{"days": 90, "maximum_allowed_days": 400}"#,
+        )
+        .actions(
+            "fork-pr-contributor-approval",
+            r#"{"approval_policy": "first_time_contributors"}"#,
+        )
+        // Verbatim from a real public repository. None of the three answers
+        // `404`, which is why they are worth writing out: reading them as
+        // errors made every plan against a public repository fail outright.
+        .respond(
+            "GET",
+            "repos/o/r/actions/permissions/access",
+            Fixture::error(
+                422,
+                "Access policy only applies to internal and private repositories.",
+            ),
+        )
+        .respond(
+            "GET",
+            "repos/o/r/actions/permissions/fork-pr-workflows-private-repos",
+            Fixture::error(
+                422,
+                "Fork PR workflow settings is not allowed for public repositories.",
+            ),
+        )
+        .respond(
+            "GET",
+            "repos/o/r/actions/permissions/selected-actions",
+            Fixture::error(
+                409,
+                "All actions and workflows are allowed on this repository",
+            ),
+        )
+}
+
+#[test]
+fn an_absent_actions_section_costs_no_requests() {
+    // Absent means unmanaged, and unmanaged should not even be read.
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    assert!(
+        !output
+            .requests
+            .iter()
+            .any(|r| r.contains("actions/permissions")),
+        "read Actions settings despite them being unmanaged: {:?}",
+        output.requests
+    );
+}
+
+#[test]
+fn a_matching_actions_section_plans_nothing() {
+    let runner = actions_defaults(Sandbox::new().config(
+        "version: 1\nactions:\n  enabled: true\n  allowed_actions: all\n  \
+         default_workflow_permissions: read\n  artifact_and_log_retention_days: 90\n",
+    ))
+    .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(0);
+    assert!(output.stdout.contains("up to date"), "{}", output.stdout);
+}
+
+#[test]
+fn each_actions_endpoint_gets_its_own_write() {
+    // GitHub rejects a body that mixes fields from two of these endpoints, so
+    // the split is a correctness requirement rather than tidiness.
+    let runner = actions_defaults(Sandbox::new().config(
+        "version: 1\nactions:\n  allowed_actions: local_only\n  \
+         default_workflow_permissions: write\n  artifact_and_log_retention_days: 30\n  \
+         fork_pr_contributor_approval: all_external_contributors\n",
+    ))
+    .accept("PUT", "repos/o/r/actions/permissions")
+    .accept("PUT", "repos/o/r/actions/permissions/workflow")
+    .accept(
+        "PUT",
+        "repos/o/r/actions/permissions/artifact-and-log-retention",
+    )
+    .accept(
+        "PUT",
+        "repos/o/r/actions/permissions/fork-pr-contributor-approval",
+    )
+    .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 4, "{writes:?}");
+    assert!(
+        writes[0].starts_with("PUT repos/o/r/actions/permissions ")
+            && writes[0].contains("\"allowed_actions\":\"local_only\"")
+            // The API refuses this body without `enabled`; it comes from the
+            // current state, so syncing a policy does not turn Actions off.
+            && writes[0].contains("\"enabled\":true"),
+        "{}",
+        writes[0]
+    );
+    assert!(
+        writes[1].contains("/workflow") && writes[1].contains("\"write\""),
+        "{}",
+        writes[1]
+    );
+    assert!(
+        writes[2].contains("/artifact-and-log-retention") && writes[2].contains("\"days\":30"),
+        "{}",
+        writes[2]
+    );
+    assert!(
+        writes[3].contains("/fork-pr-contributor-approval"),
+        "{}",
+        writes[3]
+    );
+}
+
+#[test]
+fn an_actions_setting_github_does_not_expose_is_reported_not_swallowed() {
+    // `/access` is a private-repository endpoint. On a public one the read
+    // 404s, the change is still planned, and the write fails loudly — silence
+    // would claim a convergence that never happened.
+    let runner = actions_defaults(
+        Sandbox::new().config("version: 1\nactions:\n  access_level: organization\n"),
+    )
+    .respond(
+        "PUT",
+        "repos/o/r/actions/permissions/access",
+        Fixture::error(404, "Not Found"),
+    )
+    .build();
+
+    runner.run(&["plan", "-R", "o/r"]).expect_status(2);
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(1);
+    assert!(
+        output.stderr.contains("404") || output.stdout.contains("404"),
+        "the failure must be visible\nstdout: {}\nstderr: {}",
+        output.stdout,
+        output.stderr
+    );
+}
+
+#[test]
+fn the_actions_plan_reads_the_way_it_should() {
+    let runner = actions_defaults(Sandbox::new().config(
+        "version: 1\nactions:\n  allowed_actions: selected\n  selected_actions:\n    \
+         patterns_allowed:\n      - docker/*\n  artifact_and_log_retention_days: 30\n",
+    ))
+    .build();
+
+    let output = runner.run(&["plan", "-R", "o/r", "--verbose"]);
+    output.expect_status(2);
+    assert_cli_snapshot!(output.stdout);
+}
+
+#[test]
+fn actions_endpoints_that_do_not_apply_are_not_read_as_failures() {
+    // The statuses below are what github.com actually answers on a public
+    // repository — 409 and 422, never 404. Absorbing only 404 made every plan
+    // against a public repository fail, so this pins all three.
+    let runner = actions_defaults(
+        Sandbox::new().config("version: 1\nactions:\n  artifact_and_log_retention_days: 90\n"),
+    )
+    .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    output.expect_status(0);
+    assert!(
+        output.stdout.contains("up to date"),
+        "a settings read that does not apply was treated as a failure\n{}\n{}",
+        output.stdout,
+        output.stderr
+    );
+}

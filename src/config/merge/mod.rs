@@ -25,6 +25,7 @@ use super::settings::Settings;
 use super::source::SourceId;
 use super::spans::SpanIndex;
 use crate::config::Prunable;
+use crate::resources::actions::{ActionsSettings, ForkPrWorkflowsPrivateRepos, SelectedActions};
 use crate::resources::labels::model::key as label_key;
 use crate::resources::pages::PagesSettings;
 use crate::resources::repository::{RepositorySettings, SecuritySettings};
@@ -57,6 +58,7 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
 
     let repository = merge_repository(&mut provenance, base, child);
     let pages = merge_pages(&mut provenance, base, child);
+    let actions = merge_actions(&mut provenance, base, child);
 
     let topics = merge_section(
         &mut provenance,
@@ -122,6 +124,7 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
         environments,
         variables,
         pages,
+        actions,
     };
 
     (settings, provenance)
@@ -181,6 +184,7 @@ fn merge_repository(
         has_projects,
         has_discussions,
         is_template,
+        web_commit_signoff_required,
         allow_merge_commit,
         allow_squash_merge,
         allow_rebase_merge,
@@ -224,6 +228,7 @@ fn merge_repository(
         has_projects: field!(has_projects),
         has_discussions: field!(has_discussions),
         is_template: field!(is_template),
+        web_commit_signoff_required: field!(web_commit_signoff_required),
         allow_merge_commit: field!(allow_merge_commit),
         allow_squash_merge: field!(allow_squash_merge),
         allow_rebase_merge: field!(allow_rebase_merge),
@@ -338,6 +343,170 @@ fn merge_security(
         secret_scanning_push_protection: field!(secret_scanning_push_protection),
         dependabot_security_updates: field!(dependabot_security_updates),
         secret_scanning_validity_checks: field!(secret_scanning_validity_checks),
+    })
+}
+
+/// Merge the actions section, field by field.
+///
+/// Field-wise for the same reason as `repository`: every field is an `Option`,
+/// so a child setting the retention period must not unmanage the base's
+/// workflow permissions.
+fn merge_actions(
+    provenance: &mut Provenance,
+    base: &Layer<'_>,
+    child: &Layer<'_>,
+) -> Option<ActionsSettings> {
+    let base_actions = base.settings.actions.as_ref();
+    let child_actions = child.settings.actions.as_ref();
+
+    if base_actions.is_none() && child_actions.is_none() {
+        return None;
+    }
+
+    let empty = ActionsSettings::default();
+    let b = base_actions.unwrap_or(&empty);
+    let c = child_actions.unwrap_or(&empty);
+
+    // Exhaustive, with no `..`, for the same reason as `merge_repository`.
+    let ActionsSettings {
+        enabled,
+        allowed_actions,
+        sha_pinning_required,
+        selected_actions,
+        default_workflow_permissions,
+        can_approve_pull_request_reviews,
+        artifact_and_log_retention_days,
+        fork_pr_contributor_approval,
+        access_level,
+        fork_pr_workflows_private_repos,
+    } = c;
+
+    macro_rules! field {
+        ($name:ident) => {
+            pick(
+                provenance,
+                concat!("actions.", stringify!($name)),
+                base.id,
+                b.$name.as_ref(),
+                child.id,
+                $name.as_ref(),
+            )
+        };
+    }
+
+    Some(ActionsSettings {
+        enabled: field!(enabled),
+        allowed_actions: field!(allowed_actions),
+        sha_pinning_required: field!(sha_pinning_required),
+        selected_actions: merge_selected_actions(
+            provenance,
+            base.id,
+            b.selected_actions.clone(),
+            child.id,
+            selected_actions.clone(),
+        ),
+        default_workflow_permissions: field!(default_workflow_permissions),
+        can_approve_pull_request_reviews: field!(can_approve_pull_request_reviews),
+        artifact_and_log_retention_days: field!(artifact_and_log_retention_days),
+        fork_pr_contributor_approval: field!(fork_pr_contributor_approval),
+        access_level: field!(access_level),
+        fork_pr_workflows_private_repos: merge_fork_pr_private(
+            provenance,
+            base.id,
+            b.fork_pr_workflows_private_repos.clone(),
+            child.id,
+            fork_pr_workflows_private_repos.clone(),
+        ),
+    })
+}
+
+/// Merge the allow list, which must recurse rather than be taken whole.
+///
+/// Taking the child's block outright would unmanage every field it did not
+/// mention, exactly as with `repository.security`.
+fn merge_selected_actions(
+    provenance: &mut Provenance,
+    base_id: SourceId,
+    base: Option<SelectedActions>,
+    child_id: SourceId,
+    child: Option<SelectedActions>,
+) -> Option<SelectedActions> {
+    if base.is_none() && child.is_none() {
+        return None;
+    }
+    let b = base.unwrap_or_default();
+    let c = child.unwrap_or_default();
+
+    let SelectedActions {
+        github_owned_allowed,
+        verified_allowed,
+        patterns_allowed,
+    } = c;
+
+    macro_rules! field {
+        ($name:ident) => {
+            pick(
+                provenance,
+                concat!("actions.selected_actions.", stringify!($name)),
+                base_id,
+                b.$name.as_ref(),
+                child_id,
+                $name.as_ref(),
+            )
+        };
+    }
+
+    Some(SelectedActions {
+        github_owned_allowed: field!(github_owned_allowed),
+        verified_allowed: field!(verified_allowed),
+        // Taken whole, like every other collection: a child that names one
+        // pattern means that pattern, not the base's list with one added.
+        patterns_allowed: field!(patterns_allowed),
+    })
+}
+
+/// Merge the private-repository fork PR block, recursing for the same reason.
+fn merge_fork_pr_private(
+    provenance: &mut Provenance,
+    base_id: SourceId,
+    base: Option<ForkPrWorkflowsPrivateRepos>,
+    child_id: SourceId,
+    child: Option<ForkPrWorkflowsPrivateRepos>,
+) -> Option<ForkPrWorkflowsPrivateRepos> {
+    if base.is_none() && child.is_none() {
+        return None;
+    }
+    let b = base.unwrap_or_default();
+    let c = child.unwrap_or_default();
+
+    let ForkPrWorkflowsPrivateRepos {
+        run_workflows_from_fork_pull_requests,
+        send_write_tokens_to_workflows,
+        send_secrets_and_variables,
+        require_approval_for_fork_pr_workflows,
+    } = c;
+
+    macro_rules! field {
+        ($name:ident) => {
+            pick(
+                provenance,
+                concat!(
+                    "actions.fork_pr_workflows_private_repos.",
+                    stringify!($name)
+                ),
+                base_id,
+                b.$name.as_ref(),
+                child_id,
+                $name.as_ref(),
+            )
+        };
+    }
+
+    Some(ForkPrWorkflowsPrivateRepos {
+        run_workflows_from_fork_pull_requests: field!(run_workflows_from_fork_pull_requests),
+        send_write_tokens_to_workflows: field!(send_write_tokens_to_workflows),
+        send_secrets_and_variables: field!(send_secrets_and_variables),
+        require_approval_for_fork_pr_workflows: field!(require_approval_for_fork_pr_workflows),
     })
 }
 

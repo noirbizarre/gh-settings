@@ -476,6 +476,31 @@ fn live_declared_permissions_match_what_github_accepts() {
         ),
     ];
 
+    // Every Actions settings endpoint. The `Requirement::ACTIONS` fine-grained
+    // mapping is the one declaration in this codebase that is still
+    // `unverified`, because GitHub documents the 2025 endpoints against an
+    // "Actions policies" permission that appears in no published table. These
+    // probes are how that gets settled.
+    //
+    // Reads only: the writes here take effect, and a probe is not allowed to
+    // change the sandbox as a side effect of asking a question.
+    for suffix in [
+        "",
+        "/selected-actions",
+        "/workflow",
+        "/artifact-and-log-retention",
+        "/fork-pr-contributor-approval",
+        "/access",
+        "/fork-pr-workflows-private-repos",
+    ] {
+        probes.push((
+            ResourceId::Actions,
+            "GET",
+            format!("repos/{repo}/actions/permissions{suffix}"),
+            vec![],
+        ));
+    }
+
     // The open question: are the Pages writes `Pages: write` alone, or that
     // *and* `Administration: write`? Probe whichever method applies — `PUT`
     // against a repository with no site answers 404, which would tell us
@@ -632,4 +657,128 @@ mod accepted_permissions {
     fn a_permission_we_never_declared_is_not_satisfied() {
         assert!(!satisfies(&Requirement::ISSUES, "administration=write"));
     }
+}
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_actions_settings_round_trip() {
+    let live = live_or_skip!();
+
+    // Deliberately not `enabled: false`: turning Actions off makes several of
+    // the sibling endpoints stop answering, and a test that breaks the next
+    // test is not a test.
+    live.config(&only(
+        "actions:\n  enabled: true\n  allowed_actions: local_only\n  \
+         default_workflow_permissions: read\n  can_approve_pull_request_reviews: false\n  \
+         artifact_and_log_retention_days: 30\n  \
+         fork_pr_contributor_approval: first_time_contributors\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "actions"])
+        .expect_status(0);
+    // The real assertion. A normalisation miss shows up here and nowhere else.
+    live.run(&["plan", "--only", "actions"]).expect_up_to_date();
+
+    // The allow list, which GitHub only accepts once the policy is `selected`.
+    live.config(&only(
+        "actions:\n  allowed_actions: selected\n  selected_actions:\n    \
+         github_owned_allowed: true\n    verified_allowed: false\n    \
+         patterns_allowed:\n      - docker/*\n      - actions/checkout@v4\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "actions"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "actions"]).expect_up_to_date();
+
+    // An export of the live repository must plan to nothing against it.
+    let exported = live.run(&["export", "--stdout"]);
+    exported.expect_status(0);
+    assert!(
+        exported.stdout.contains("actions:"),
+        "export omitted the actions section:\n{}",
+        exported.stdout
+    );
+    live.config(&exported.stdout);
+    live.run(&["plan", "--only", "actions"]).expect_up_to_date();
+}
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_actions_private_only_settings_are_reported_not_swallowed() {
+    // The sandbox is public (ADR-019), so `/access` does not exist on it. The
+    // point of this test is that gh-settings says so rather than reporting
+    // success: a read we could not perform must never become "up to date".
+    let live = live_or_skip!();
+
+    live.config(&only("actions:\n  access_level: organization\n"));
+
+    // Pending, not up to date: the plan proposes the change it cannot verify.
+    live.run(&["plan", "--only", "actions"]).expect_status(2);
+
+    let output = live.run(&["sync", "--yes", "--only", "actions"]);
+    assert_ne!(
+        output.status, 0,
+        "a write GitHub rejected was reported as success:\n{}\n{}",
+        output.stdout, output.stderr
+    );
+}
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_actions_private_only_settings_apply_when_private() {
+    // `/access` and `/fork-pr-workflows-private-repos` exist only on private
+    // repositories, and ADR-019 requires the sandbox to be public. So flip it,
+    // prove the happy path, and flip it back — from a guard, so a panic in the
+    // middle cannot strand the sandbox private.
+    let live = live_or_skip!();
+
+    struct Visibility<'a>(&'a str);
+
+    impl Visibility<'_> {
+        fn set(&self, private: bool) {
+            let status = std::process::Command::new("gh")
+                .args(["api", &format!("repos/{}", self.0)])
+                .args(["--method", "PATCH", "--silent"])
+                .args(["-F", &format!("private={private}")])
+                .status();
+            if !matches!(status, Ok(status) if status.success()) {
+                eprintln!("could not set private={private} on {}", self.0);
+            }
+        }
+    }
+
+    impl Drop for Visibility<'_> {
+        fn drop(&mut self) {
+            self.set(false);
+        }
+    }
+
+    let visibility = Visibility(live.repo());
+    visibility.set(true);
+
+    // GitHub needs a moment after a visibility change before the private-only
+    // endpoints answer. Asking once and giving up would make this test flake.
+    let mut ready = false;
+    for _ in 0..10 {
+        if live
+            .api(&["repos", live.repo(), "actions", "permissions", "access"])
+            .is_ok()
+        {
+            ready = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+    assert!(
+        ready,
+        "the sandbox never became private enough for /access to answer; \
+         it may be a personal repository on a plan without this feature"
+    );
+
+    live.config(&only(
+        "actions:\n  access_level: user\n  fork_pr_workflows_private_repos:\n    \
+         run_workflows_from_fork_pull_requests: true\n    \
+         require_approval_for_fork_pr_workflows: true\n",
+    ));
+    live.run(&["sync", "--yes", "--only", "actions"])
+        .expect_status(0);
+    live.run(&["plan", "--only", "actions"]).expect_up_to_date();
 }

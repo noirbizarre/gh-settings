@@ -134,6 +134,49 @@ impl Sandbox {
         self.respond("GET", "repos/o/r/pages", Fixture::error(404, "Not Found"))
     }
 
+    /// Every Actions settings endpoint, relative to `repos/o/r`.
+    ///
+    /// The empty suffix is `actions/permissions` itself.
+    pub const ACTIONS_ENDPOINTS: &'static [&'static str] = &[
+        "",
+        "selected-actions",
+        "workflow",
+        "artifact-and-log-retention",
+        "fork-pr-contributor-approval",
+        "access",
+        "fork-pr-workflows-private-repos",
+    ];
+
+    /// The full path of one Actions settings endpoint.
+    pub fn actions_endpoint(suffix: &str) -> String {
+        match suffix {
+            "" => "repos/o/r/actions/permissions".to_string(),
+            other => format!("repos/o/r/actions/permissions/{other}"),
+        }
+    }
+
+    /// Answer every Actions settings read with a `404`.
+    ///
+    /// Worth registering explicitly for the same reason as [`Self::no_pages`]:
+    /// an unregistered read answers `[]`, which serde reads as an all-default
+    /// group, so a repository whose settings we never asked about would look
+    /// like one that answered and said nothing.
+    pub fn no_actions(mut self) -> Self {
+        for suffix in Self::ACTIONS_ENDPOINTS {
+            self = self.respond(
+                "GET",
+                &Self::actions_endpoint(suffix),
+                Fixture::error(404, "Not Found"),
+            );
+        }
+        self
+    }
+
+    /// Register one Actions settings read, by endpoint suffix.
+    pub fn actions(self, suffix: &str, body: &str) -> Self {
+        self.get(&Self::actions_endpoint(suffix), body)
+    }
+
     /// Set the scopes the stub's `gh auth status` reports.
     ///
     /// Mirrors real `gh`, which reports scopes inline for classic tokens and

@@ -6,6 +6,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::resources::actions::ActionsSettings;
 use crate::resources::autolinks::Autolink;
 use crate::resources::environments::Environment;
 use crate::resources::labels::Label;
@@ -107,6 +108,14 @@ pub struct Settings {
     /// express "disabled" with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pages: Option<PagesSettings>,
+
+    /// GitHub Actions general settings.
+    ///
+    /// Everything on *Settings → Actions → General*: whether Actions runs, which
+    /// actions are allowed, artifact retention, fork pull request approval and
+    /// the default `GITHUB_TOKEN` permissions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<ActionsSettings>,
 }
 
 impl Settings {
@@ -145,6 +154,7 @@ impl Settings {
             && self.environments.is_none()
             && self.variables.is_none()
             && self.pages.is_none()
+            && self.actions.is_none()
     }
 
     /// Cross-section checks that no individual resource can perform.

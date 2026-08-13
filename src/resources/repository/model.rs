@@ -97,6 +97,13 @@ pub struct RepositorySettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_template: Option<bool>,
 
+    /// Whether commits made through the web interface must be signed off.
+    ///
+    /// Adds a `Signed-off-by` trailer to commits created in the browser, for
+    /// projects that require a Developer Certificate of Origin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web_commit_signoff_required: Option<bool>,
+
     /// Whether merge commits are allowed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allow_merge_commit: Option<bool>,

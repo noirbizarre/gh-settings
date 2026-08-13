@@ -363,6 +363,47 @@ impl Live {
             Some(_) => {}
         }
 
+        // Actions settings have no `prune` either — every one of them has a
+        // value, never an existence — so they are reset the way the web UI
+        // would leave a fresh repository. Done through `gh` rather than through
+        // the tool: this must work even when the tool is what is broken.
+        //
+        // Visibility comes first. `live_actions_private_only_settings_apply`
+        // flips the sandbox to private, and a run that panics between the flip
+        // and the flip back would otherwise strand it there — where ADR-019
+        // says the rulesets tests cannot run on a free plan.
+        let _ = Command::new("gh")
+            .args(["api", &format!("repos/{}", self.repo)])
+            .args(["--method", "PATCH", "-F", "private=false", "--silent"])
+            .output();
+
+        for (endpoint, fields) in [
+            (
+                "actions/permissions",
+                vec!["enabled=true", "allowed_actions=all"],
+            ),
+            (
+                "actions/permissions/workflow",
+                vec![
+                    "default_workflow_permissions=read",
+                    "can_approve_pull_request_reviews=false",
+                ],
+            ),
+            (
+                "actions/permissions/fork-pr-contributor-approval",
+                vec!["approval_policy=first_time_contributors"],
+            ),
+        ] {
+            let mut command = Command::new("gh");
+            command
+                .args(["api", &format!("repos/{}/{endpoint}", self.repo)])
+                .args(["--method", "PUT", "--silent"]);
+            for field in fields {
+                command.args(["-F", field]);
+            }
+            let _ = command.output();
+        }
+
         // Pages has no `prune` — the configuration format describes a site that
         // exists, never its absence — so it cannot go through the tool at all.
         //

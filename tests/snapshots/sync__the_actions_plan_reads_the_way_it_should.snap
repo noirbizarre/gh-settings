@@ -1,0 +1,15 @@
+---
+source: tests/sync.rs
+expression: output.stdout
+---
+Plan for o/r
+
+Actions
+  ~ update Actions permissions
+      allowed_actions: all → selected
+  ~ update the allowed actions
+      patterns_allowed: docker/*
+  ~ update artifact and log retention
+      days: 90 → 30
+
+3 to update.

@@ -214,6 +214,7 @@ fn every_boolean_setting_is_actually_diffed() {
         "has_projects": true,
         "has_discussions": true,
         "is_template": true,
+        "web_commit_signoff_required": true,
         "allow_merge_commit": true,
         "allow_squash_merge": true,
         "allow_rebase_merge": true,
@@ -281,5 +282,22 @@ fn anonymous_access_is_only_exported_when_github_reports_it() {
     assert_eq!(
         current(json!({"anonymous_access_enabled": true})).anonymous_access_enabled,
         Some(true)
+    );
+}
+
+#[test]
+fn web_commit_signoff_is_left_alone_when_omitted() {
+    assert!(plan("has_issues: true", json!({"has_issues": true})).is_empty());
+}
+
+#[test]
+fn web_commit_signoff_is_required_when_declared() {
+    let changes = plan(
+        "web_commit_signoff_required: true",
+        json!({"web_commit_signoff_required": false}),
+    );
+    assert_eq!(
+        body(&changes[0])["web_commit_signoff_required"],
+        json!(true)
     );
 }

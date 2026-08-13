@@ -15,6 +15,7 @@ repository:
   has_projects: true
   has_discussions: false
   is_template: false
+  web_commit_signoff_required: false
   allow_merge_commit: true
   allow_squash_merge: true
   allow_rebase_merge: true

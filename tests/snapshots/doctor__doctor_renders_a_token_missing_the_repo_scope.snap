@@ -15,6 +15,7 @@ Resources
   ✘ autolinks     missing the `repo` scope
   ✘ rulesets      missing the `repo` scope
   ✘ environments  missing the `repo` scope
+  ✘ actions       missing the `repo` scope
   ✘ variables     missing the `repo` scope
   ✘ pages         missing the `repo` scope
 
