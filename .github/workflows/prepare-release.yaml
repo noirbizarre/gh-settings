@@ -96,6 +96,10 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Releasing ${last_tag:-<nothing>} -> $next_tag"
           fi
+        env:
+          # git-cliff use the github integration
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
 
       - name: Generate the changelog
         if: steps.version.outputs.changed == 'true'
@@ -114,6 +118,9 @@ jobs:
           # it. The `0,/^## /` range stops at the first match, leaving later
           # `##` sections such as New Contributors alone.
           sed -i -e '0,/^## /{/^## /d}' -e '/./,$!d' "$RUNNER_TEMP/ship-notes.md"
+        env:
+          # git-cliff use the github integration
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Apply the version
         if: steps.version.outputs.changed == 'true'
