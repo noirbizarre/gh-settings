@@ -258,6 +258,12 @@ impl Resource for Environments {
         for (_, desired_environment, existing) in diff.matched {
             let fields = desired_environment.diff_against(&existing.environment);
 
+            // Not gated on `prune`. Removing a pattern from a policy the user
+            // *is* declaring is an edit to that policy, not a prune: the
+            // declared list is the whole list, and the alternative is a
+            // permanent diff nothing could ever reconcile. Pruning governs
+            // whole environments the configuration stops mentioning, which is
+            // the `diff.deleted` loop below.
             let (create_patterns, delete_pattern_ids) =
                 pattern_changes(&desired_environment, &existing);
 

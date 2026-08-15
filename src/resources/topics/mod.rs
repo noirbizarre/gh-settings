@@ -230,7 +230,7 @@ impl Resource for Topics {
     ) -> GitHubResult<()> {
         let payload: Payload = change
             .decode()
-            .unwrap_or_else(|error| panic!("topics change carried a bad payload: {error}"));
+            .unwrap_or_else(|error| panic!("topics change carried an undecodable payload: {error}"));
 
         client
             .execute(Request::put(

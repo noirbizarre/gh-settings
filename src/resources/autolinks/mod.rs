@@ -292,7 +292,7 @@ impl Resource for Autolinks {
     ) -> GitHubResult<()> {
         let payload: Payload = change
             .decode()
-            .unwrap_or_else(|error| panic!("autolink change carried a bad payload: {error}"));
+            .unwrap_or_else(|error| panic!("autolink change carried an undecodable payload: {error}"));
 
         // Delete first: GitHub rejects a second autolink with the same prefix, so
         // a recreate that created first would always fail with a 422.

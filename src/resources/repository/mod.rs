@@ -439,7 +439,7 @@ impl Resource for Repository {
     ) -> GitHubResult<()> {
         let payload: Payload = change
             .decode()
-            .unwrap_or_else(|error| panic!("repository change carried a bad payload: {error}"));
+            .unwrap_or_else(|error| panic!("repository change carried an undecodable payload: {error}"));
 
         let body = match payload {
             Payload::Settings(body) | Payload::Security(body) => body,
