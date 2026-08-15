@@ -101,8 +101,8 @@ cannot disagree about what a token can do.
 
 ### Features
 
-- [x] **A composite action** — `uses: noirbizarre/gh-settings@main` until the
-      first release carries it, `@v1` after. Maps exit
+- [x] **A composite action** — `uses: noirbizarre/gh-settings@main` or an exact
+      release tag until 1.0, `@v1` after. Maps exit
       code 2 to a `changed` output rather than a failed job, writes the plan to
       the job summary, and annotates a 403 with the token explanation. See
       [GitHub Actions](actions.md).

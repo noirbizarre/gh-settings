@@ -11,10 +11,11 @@ hand-writing `gh extension install` in every repository.
 
 !!! note "Why `@main`"
 
-    The action has not been in a release yet, so there is no tag to pin to.
-    `@v1` appears in most Actions documentation and will work here too, from the
-    first 1.x release onwards — a floating alias is published with each one.
-    Until then `@main` is the only ref that resolves.
+    Releases are tagged without a `v` prefix, so `@0.2.0` pins to an exact
+    version today. There is no floating alias yet: `@v1` appears in most Actions
+    documentation and will work here from the first 1.x release onwards, but a
+    0.x major promises no compatibility, so no `v0` is published. Until 1.0,
+    pin to an exact release or track `@main`.
 
 !!! warning "The default token is not enough"
 
