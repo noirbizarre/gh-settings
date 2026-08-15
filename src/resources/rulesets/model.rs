@@ -586,7 +586,22 @@ impl Ruleset {
 
     /// Build the API request body.
     pub fn as_body(&self) -> Value {
-        super::ruleset_body(self)
+        let mut body = Map::new();
+        body.insert("name".into(), json!(self.name));
+        body.insert("target".into(), json!(self.target.as_str()));
+        body.insert("enforcement".into(), json!(self.enforcement.as_str()));
+        body.insert(
+            "bypass_actors".into(),
+            Value::Array(self.bypass_actors.iter().map(BypassActor::to_api).collect()),
+        );
+        if let Some(conditions) = &self.conditions {
+            body.insert("conditions".into(), conditions.to_api());
+        }
+        body.insert(
+            "rules".into(),
+            Value::Array(self.rules.iter().map(Rule::to_api).collect()),
+        );
+        Value::Object(body)
     }
 
     /// A copy fit for writing back into a configuration file.

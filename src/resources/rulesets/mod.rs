@@ -26,7 +26,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::Value;
 
 use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
@@ -252,7 +252,9 @@ impl Resource for Rulesets {
 
         match change.op {
             Op::Create => {
-                let ruleset = payload.ruleset.expect("create carries a ruleset");
+                let ruleset = payload
+                    .ruleset
+                    .unwrap_or_else(|| panic!("a ruleset create change carried no ruleset"));
                 client
                     .execute(Request::post(
                         target.endpoint("rulesets"),
@@ -261,8 +263,12 @@ impl Resource for Rulesets {
                     .await
             }
             Op::Update | Op::Recreate => {
-                let ruleset = payload.ruleset.expect("update carries a ruleset");
-                let id = payload.id.expect("update carries an id");
+                let ruleset = payload
+                    .ruleset
+                    .unwrap_or_else(|| panic!("a ruleset update change carried no ruleset"));
+                let id = payload
+                    .id
+                    .unwrap_or_else(|| panic!("a ruleset update change carried no id"));
                 client
                     .execute(Request::put(
                         target.endpoint(&format!("rulesets/{id}")),
@@ -271,7 +277,9 @@ impl Resource for Rulesets {
                     .await
             }
             Op::Delete => {
-                let id = payload.id.expect("delete carries an id");
+                let id = payload
+                    .id
+                    .unwrap_or_else(|| panic!("a ruleset delete change carried no id"));
                 client
                     .execute(Request::delete(target.endpoint(&format!("rulesets/{id}"))))
                     .await
@@ -325,32 +333,6 @@ fn from_state(state: &RulesetState) -> Ruleset {
         rules: state.rules.iter().filter_map(Rule::from_api).collect(),
     }
     .normalized()
-}
-
-/// Build the JSON body for a ruleset.
-pub(crate) fn ruleset_body(ruleset: &Ruleset) -> Value {
-    let mut body = Map::new();
-    body.insert("name".into(), json!(ruleset.name));
-    body.insert("target".into(), json!(ruleset.target.as_str()));
-    body.insert("enforcement".into(), json!(ruleset.enforcement.as_str()));
-    body.insert(
-        "bypass_actors".into(),
-        Value::Array(
-            ruleset
-                .bypass_actors
-                .iter()
-                .map(BypassActor::to_api)
-                .collect(),
-        ),
-    );
-    if let Some(conditions) = &ruleset.conditions {
-        body.insert("conditions".into(), conditions.to_api());
-    }
-    body.insert(
-        "rules".into(),
-        Value::Array(ruleset.rules.iter().map(Rule::to_api).collect()),
-    );
-    Value::Object(body)
 }
 
 #[cfg(test)]
