@@ -310,7 +310,8 @@ Reading a base needs `Contents: read` on **that** repository, which the Actions
 **Important:** `secrets.GITHUB_TOKEN` **cannot** manage repository settings.
 
 A workflow's `permissions:` block has no `administration` key, so repository
-metadata, topics, autolinks, rulesets and environments cannot be granted to it —
+metadata, topics, autolinks, rulesets, environments and Actions general settings
+cannot be granted to it —
 this is not a permission you forgot to enable, it cannot be requested at all.
 Variables are blocked the same way, by the missing `variables` key. Labels and
 Pages are the exceptions, since they live under `Issues: write` and
