@@ -182,7 +182,7 @@ impl Resource for Pages {
     ) -> GitHubResult<()> {
         let payload: Payload = change
             .decode()
-            .unwrap_or_else(|error| panic!("pages change carried a bad payload: {error}"));
+            .unwrap_or_else(|error| panic!("pages change carried an undecodable payload: {error}"));
 
         let endpoint = target.endpoint("pages");
         match payload {

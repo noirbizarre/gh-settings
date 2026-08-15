@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
@@ -336,12 +336,15 @@ impl Resource for Variables {
                     .execute(Request::post(collection, payload.variable.as_body()))
                     .await
             }
-            Op::Update | Op::Recreate => {
+            Op::Update => {
                 client
                     .execute(Request::patch(item, payload.variable.as_body()))
                     .await
             }
             Op::Delete => client.execute(Request::delete(item)).await,
+            // A variable's value is patchable in place, so `diff` never emits a
+            // recreate.
+            Op::Recreate => unreachable!("variables are never recreated"),
         }
     }
 
@@ -360,13 +363,9 @@ impl Resource for Variables {
             return Ok(None);
         }
 
-        Ok(Some(Value::Array(
-            current
-                .variables
-                .values()
-                .map(|variable| json!({ "name": variable.name, "value": variable.value }))
-                .collect(),
-        )))
+        let variables: Vec<_> = current.variables.values().collect();
+
+        Ok(Some(serde_json::to_value(variables).unwrap_or(Value::Null)))
     }
 }
 

@@ -111,7 +111,7 @@ produces a standalone `gh-settings` binary rather than a `gh` subcommand, so the
 # Generate a configuration file from a repository you already have
 gh settings export
 
-# Check it, without touching the network
+# Check it, without touching the network — unless it uses `extends:`
 gh settings validate
 
 # See what would change
@@ -310,10 +310,12 @@ Reading a base needs `Contents: read` on **that** repository, which the Actions
 **Important:** `secrets.GITHUB_TOKEN` **cannot** manage repository settings.
 
 A workflow's `permissions:` block has no `administration` key, so repository
-metadata, topics, autolinks, rulesets and environments cannot be granted to it —
+metadata, topics, autolinks, rulesets, environments and Actions general settings
+cannot be granted to it —
 this is not a permission you forgot to enable, it cannot be requested at all.
-Variables are blocked the same way, by the missing `variables` key. Labels are
-the exception, since they live under `Issues: write`.
+Variables are blocked the same way, by the missing `variables` key. Labels and
+Pages are the exceptions, since they live under `Issues: write` and
+`Pages: write`, both of which the `permissions:` block does have keys for.
 
 Use a personal access token or a GitHub App installation token:
 
@@ -355,6 +357,7 @@ Resources
   ✔ autolinks
   ✔ rulesets
   ✔ environments
+  ✔ actions
   ✔ variables
   ✔ pages
 ```

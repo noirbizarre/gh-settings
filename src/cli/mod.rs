@@ -131,7 +131,7 @@ pub struct GlobalArgs {
     #[arg(long, global = true, value_name = "WHEN", value_enum)]
     pub color: Option<ColorChoice>,
 
-    /// Increase log verbosity. Repeat for more.
+    /// Increase log verbosity. Repeat for more. `RUST_LOG` overrides it.
     #[arg(long, global = true, action = clap::ArgAction::Count)]
     pub debug: u8,
 }

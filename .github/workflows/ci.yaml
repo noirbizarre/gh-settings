@@ -109,11 +109,11 @@ jobs:
       - name: Check
         run: cargo check --all-targets
 
-  # Three documents are produced from the code and committed: the JSON Schema
-  # (a published contract users reference by URL), the CLI reference, and the
-  # per-resource permission table. A stale copy misleads silently — the
-  # permission table once *claimed* to be generated while being hand-written,
-  # which is precisely what this job now prevents.
+  # Four documents are produced from the code and committed: the JSON Schema
+  # (a published contract users reference by URL), the CLI reference, the
+  # per-resource permission table, and the action inputs table. A stale copy
+  # misleads silently — the permission table once *claimed* to be generated
+  # while being hand-written, which is precisely what this job now prevents.
   schema:
     name: 📐 Generated docs
     runs-on: ubuntu-latest

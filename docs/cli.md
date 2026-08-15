@@ -20,7 +20,7 @@ Accepted by every command.
 | `--format <FORMAT>` | Output format. One of: `text`, `json`. Defaults to `text`. |
 | `-v, --verbose` | Show field-level detail. |
 | `--color <WHEN>` | Colourise output. Detected from the terminal by default; `NO_COLOR` is honoured. One of: `auto`, `always`, `never`. |
-| `--debug` | Increase log verbosity. Repeat for more. |
+| `--debug` | Increase log verbosity. Repeat for more. `RUST_LOG` overrides it. |
 
 ## Commands
 

@@ -58,15 +58,18 @@ files = "\\.rs$"
 pass_filenames = false
 
 # Documentation generated from the code: the JSON Schema (a public contract,
-# ADR-007), the CLI reference, and the per-resource permission table (ADR-015).
-# A stale copy silently misleads — the permission table once claimed to be
-# generated while being hand-maintained, which is exactly what this prevents.
+# ADR-007), the CLI reference, the per-resource permission table (ADR-015) and
+# the action inputs table. A stale copy silently misleads — the permission table
+# once claimed to be generated while being hand-maintained, which is exactly
+# what this prevents.
 [[repos.hooks]]
 id = "generated-docs"
 name = "generated documentation is up to date"
 language = "system"
 entry = "bash -c 'mise run docs:reference && git diff --exit-code -- docs/configuration.md docs/cli.md docs/authentication.md docs/actions.md schema/'"
-files = "^(src/|schema/|docs/|scripts/)"
+# `action.yml` is in the list because its descriptions are spliced into
+# docs/actions.md: editing it alone must still re-run the generator.
+files = "^(src/|schema/|docs/|scripts/|action\\.yml$)"
 pass_filenames = false
 
 # A release asset `gh` cannot resolve makes the extension uninstallable on a

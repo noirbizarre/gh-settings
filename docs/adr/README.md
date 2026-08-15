@@ -21,10 +21,10 @@ supersedes it, rather than a rewrite of history.
 | [013](013-single-crate.md) | Single crate until a second consumer exists | Accepted |
 | [014](014-releases.md) | Releases are orchestrated by gh-ship | Accepted, narrowed by 022 |
 | [015](015-token-requirements.md) | Token requirements are declared per resource | Accepted, extended by 020 |
-| [016](016-diagnostic-provenance.md) | Diagnostics carry the identity of the document they came from | Accepted |
+| [016](016-diagnostic-provenance.md) | Diagnostics carry the identity of the document they came from | Accepted, resolution rule superseded by 017 |
 | [017](017-inheritance.md) | Inheritance replaces whole items, and provenance follows the merge | Accepted |
 | [018](018-resources-may-span-sections.md) | A resource may span more than one configuration section | Accepted |
 | [019](019-live-test-sandboxes.md) | Live-test sandboxes are owned, not created per run | Accepted, extended by 021 |
-| [020](020-permission-categories-do-not-nest.md) | Fine-grained permission categories do not nest | Accepted |
+| [020](020-permission-categories-do-not-nest.md) | Fine-grained permission categories do not nest | Accepted, extended by 021 |
 | [021](021-actions-settings.md) | Actions general settings are one section over seven endpoints | Accepted |
 | [022](022-signed-release-commits.md) | The release commit is signed by a GitHub App | Accepted |

@@ -32,8 +32,9 @@ each commit.
 | `mise run lint:actions` | `actionlint` over the workflows |
 | `mise run spell` | `typos` |
 | `mise run schema` | Regenerate the committed JSON Schema |
-| `mise run schema:check` | Fail if the committed schema is stale (what CI runs) |
-| `mise run docs:reference` | Regenerate the configuration reference from it |
+| `mise run schema:check` | Fail if the committed schema is stale |
+| `mise run docs:reference` | Regenerate every document derived from the code |
+| `mise run docs:check` | Fail if any generated document is stale (what CI runs) |
 | `mise run docs` | Serve the documentation locally |
 | `mise run dogfood` | `gh ship validate` — check the release setup |
 
@@ -42,7 +43,9 @@ each commit.
 This is the path the architecture is designed for, and it should not require
 touching the engine.
 
-1. Create `src/resources/<name>/` with `mod.rs`, `model.rs` and `tests.rs`.
+1. Create `src/resources/<name>/` with `mod.rs` and `tests.rs`, plus a
+   `model.rs` if the types are big enough to want their own file — `topics` and
+   `autolinks` are small enough that they are not.
 2. Implement the `Resource` trait. The associated `Desired` and `Current` types
    are yours to shape.
 3. **Write `normalized()` first.** GitHub rewrites what you send it — lowercasing,

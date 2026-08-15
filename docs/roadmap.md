@@ -21,6 +21,7 @@ eventually be manageable here.*
 | Rulesets | ✅ | unknown rule types round-trip untouched rather than being dropped |
 | Inheritance (`extends:`) | ✅ | single level, ref pinned, `prune` never inherited |
 | Environments | ✅ | protection rules, reviewers and deployment branch policies |
+| Actions general settings | ✅ | allowed actions, workflow permissions, artifact and log retention, fork PR approval |
 | Actions variables | ✅ | repository and environment scope; values are readable, so they diff |
 | Pages | ✅ | build type, source, custom domain and HTTPS; declaring the section enables the site, nothing ever disables it. The `public` flag is reported by the API but not settable through it, so it is not offered |
 | Custom properties | planned | |
@@ -44,7 +45,7 @@ reason stops applying.
 ### Verification
 
 - [x] **A live test suite** against a real throwaway repository, `#[ignore]`d
-      and gated on `GH_SETTINGS_TEST_REPO`. Thirteen tests covering each resource's
+      and gated on `GH_SETTINGS_TEST_REPO`. Covers each resource's
       create → update → prune cycle, re-planning after every mutation, plus one
       that asks GitHub which permissions each endpoint really requires. Runs on
       every push to `main` that touches the code, nightly, and on demand;
@@ -100,8 +101,8 @@ cannot disagree about what a token can do.
 
 ### Features
 
-- [x] **A composite action** — `uses: noirbizarre/gh-settings@main` until the
-      first release carries it, `@v1` after. Maps exit
+- [x] **A composite action** — `uses: noirbizarre/gh-settings@main` or an exact
+      release tag until 1.0, `@v1` after. Maps exit
       code 2 to a `changed` output rather than a failed job, writes the plan to
       the job summary, and annotates a 403 with the token explanation. See
       [GitHub Actions](actions.md).
@@ -127,8 +128,10 @@ cannot disagree about what a token can do.
 - [ ] Installation page with per-platform notes and upgrading.
 - [ ] Quick start: export → validate → plan → sync on an existing repository.
 - [ ] Migration guide from `safe-settings` — what is read, what has to be
-      removed before the file will parse (org-level `suborgs`/`overrides`,
-      `branches`, `collaborators`), and above all that **pruning is off by
+      removed before the file will parse (org-level `suborgs`/`overrides`, and
+      the sections listed in [ADR-006](adr/006-safe-settings-compatibility.md):
+      `branches`, `collaborators`, `teams`, `milestones`), and above all that
+      **pruning is off by
       default**, so the first run is non-destructive. The README and the index
       both say so; what is missing is the step-by-step.
 - [ ] FAQ: why not safe-settings, why no secrets, why a `403`, why a PAT in CI.
@@ -180,7 +183,7 @@ repository. Several are destructive.
 - [x] Run any `sync` **twice**; the second must report "up to date" — this is
       what caught the ruleset permanent diff
 - [ ] `doctor` inside GitHub Actions with `secrets.GITHUB_TOKEN` — should report
-      labels-only and say why
+      labels and Pages as manageable, everything else refused, and say why
 - [ ] `gh extension install noirbizarre/gh-settings` on a clean machine
 
 A `422` means a payload-shape bug, and GitHub will not say which field.

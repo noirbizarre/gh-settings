@@ -11,18 +11,19 @@ hand-writing `gh extension install` in every repository.
 
 !!! note "Why `@main`"
 
-    The action has not been in a release yet, so there is no tag to pin to.
-    `@v1` appears in most Actions documentation and will work here too, from the
-    first 1.x release onwards — a floating alias is published with each one.
-    Until then `@main` is the only ref that resolves.
+    Releases are tagged without a `v` prefix, so `@0.2.0` pins to an exact
+    version today. There is no floating alias yet: `@v1` appears in most Actions
+    documentation and will work here from the first 1.x release onwards, but a
+    0.x major promises no compatibility, so no `v0` is published. Until 1.0,
+    pin to an exact release or track `@main`.
 
 !!! warning "The default token is not enough"
 
     `token` defaults to the workflow's own `GITHUB_TOKEN`, which can manage
-    **labels and nothing else**. Repository settings, topics, autolinks,
-    rulesets and environments need `Administration: write`, and variables need
-    `Variables: write`. The workflow `permissions:` block has neither key —
-    they cannot be granted at all.
+    **labels and Pages, and nothing else**. Repository settings, topics,
+    autolinks, rulesets, environments and Actions general settings need
+    `Administration: write`, and variables need `Variables: write`. The workflow
+    `permissions:` block has neither key — they cannot be granted at all.
 
     Use a personal access token or a GitHub App installation token. See
     [Authentication](authentication.md).
@@ -127,7 +128,7 @@ cannot tell — a fine-grained token does not report its scopes.
 | Input | Default | Description |
 |---|---|---|
 | `command` | `sync` | What to run: sync, plan, validate, export or doctor. `plan` reports drift without changing anything and sets `changed`. |
-| `token` | `${{ github.token }}` | Token used to talk to GitHub. The default is the workflow's own GITHUB_TOKEN, which is enough for `validate` and for labels — and nothing else. Repository settings, topics, autolinks, rulesets and environments need `Administration: write`, and variables need `Variables: write`. The workflow `permissions:` block cannot grant either, because it has no key for them. For those, supply a personal access token or a GitHub App installation token. Run this action with `command: doctor` to see what a token can manage. See https://noirbizarre.github.io/gh-settings/authentication/ |
+| `token` | `${{ github.token }}` | Token used to talk to GitHub. The default is the workflow's own GITHUB_TOKEN, which is enough for `validate`, for labels and for Pages — and nothing else. Repository settings, topics, autolinks, rulesets, environments and Actions general settings need `Administration: write`, and variables need `Variables: write`. The workflow `permissions:` block cannot grant either, because it has no key for them. For those, supply a personal access token or a GitHub App installation token. Run this action with `command: doctor` to see what a token can manage. See https://noirbizarre.github.io/gh-settings/authentication/ |
 | `repository` | `${{ github.repository }}` | Repository to act on, as owner/repo. |
 | `config` |  | Path to the configuration file. Defaults to .github/settings.yml. |
 | `only` |  | Limit the run to specific resources, comma separated (e.g. labels,topics). |

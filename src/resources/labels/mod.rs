@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
@@ -208,7 +208,7 @@ impl Resource for Labels {
                     ))
                     .await
             }
-            Op::Update | Op::Recreate => {
+            Op::Update => {
                 let existing = payload.from.as_deref().unwrap_or(&payload.label.name);
                 client
                     .execute(Request::patch(
@@ -224,6 +224,8 @@ impl Resource for Labels {
                     ))
                     .await
             }
+            // Labels are renamed in place, so `diff` never emits a recreate.
+            Op::Recreate => unreachable!("labels are never recreated"),
         }
     }
 
@@ -240,20 +242,7 @@ impl Resource for Labels {
         let mut labels: Vec<&Label> = current.labels.values().collect();
         labels.sort_by(|a, b| a.name.cmp(&b.name));
 
-        Ok(Some(Value::Array(
-            labels
-                .into_iter()
-                .map(|label| {
-                    let mut object = serde_json::Map::new();
-                    object.insert("name".into(), json!(label.name));
-                    object.insert("color".into(), json!(label.color));
-                    if let Some(description) = &label.description {
-                        object.insert("description".into(), json!(description));
-                    }
-                    Value::Object(object)
-                })
-                .collect(),
-        )))
+        Ok(Some(serde_json::to_value(labels).unwrap_or(Value::Null)))
     }
 }
 

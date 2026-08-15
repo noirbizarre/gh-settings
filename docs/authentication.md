@@ -35,12 +35,12 @@ statuses, pages
 
 **There is no `administration` key.** It cannot be requested at any value.
 
-Repository metadata, topics, autolinks, rulesets and environments all require
-`Administration: write`; Actions variables require `Variables: write`, and the
-ones nested under an environment require `Environments: write`. None of those
-keys exists in the list above, so they are *structurally* unavailable to
-`GITHUB_TOKEN` — this is not a permission you forgot to enable, it cannot be
-granted at all.
+Repository metadata, topics, autolinks, rulesets, environments and Actions
+general settings all require `Administration: write`; Actions variables require
+`Variables: write`, and the ones nested under an environment require
+`Environments: write`. None of those keys exists in the list above, so they are
+*structurally* unavailable to `GITHUB_TOKEN` — this is not a permission you
+forgot to enable, it cannot be granted at all.
 
 Labels and Pages are the exceptions. Labels fall under `Issues: write`, and
 `pages` is in the list above — both are permissions `GITHUB_TOKEN` can hold.

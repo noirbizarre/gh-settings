@@ -101,6 +101,12 @@ pub enum GitHubError {
     InvalidTarget(String),
 
     /// No repository could be inferred and none was given.
+    ///
+    /// Returned by `config::discover::infer_target`, whose only non-test caller
+    /// discards it for [`ContextError::NoTarget`](crate::cli::ContextError),
+    /// which is what a user actually sees. The message and help are kept
+    /// identical to that one deliberately: if this variant ever does reach the
+    /// surface, it must not read differently.
     #[error("could not determine which repository to act on")]
     #[diagnostic(
         code(gh_settings::github::no_target),
