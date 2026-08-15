@@ -21,6 +21,7 @@ eventually be manageable here.*
 | Rulesets | ✅ | unknown rule types round-trip untouched rather than being dropped |
 | Inheritance (`extends:`) | ✅ | single level, ref pinned, `prune` never inherited |
 | Environments | ✅ | protection rules, reviewers and deployment branch policies |
+| Actions general settings | ✅ | allowed actions, workflow permissions, artifact and log retention, fork PR approval |
 | Actions variables | ✅ | repository and environment scope; values are readable, so they diff |
 | Pages | ✅ | build type, source, custom domain and HTTPS; declaring the section enables the site, nothing ever disables it. The `public` flag is reported by the API but not settable through it, so it is not offered |
 | Custom properties | planned | |
