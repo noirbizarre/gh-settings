@@ -208,7 +208,7 @@ impl Resource for Labels {
                     ))
                     .await
             }
-            Op::Update | Op::Recreate => {
+            Op::Update => {
                 let existing = payload.from.as_deref().unwrap_or(&payload.label.name);
                 client
                     .execute(Request::patch(
@@ -224,6 +224,8 @@ impl Resource for Labels {
                     ))
                     .await
             }
+            // Labels are renamed in place, so `diff` never emits a recreate.
+            Op::Recreate => unreachable!("labels are never recreated"),
         }
     }
 

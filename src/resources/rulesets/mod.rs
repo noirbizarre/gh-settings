@@ -262,7 +262,7 @@ impl Resource for Rulesets {
                     ))
                     .await
             }
-            Op::Update | Op::Recreate => {
+            Op::Update => {
                 let ruleset = payload
                     .ruleset
                     .unwrap_or_else(|| panic!("a ruleset update change carried no ruleset"));
@@ -284,6 +284,9 @@ impl Resource for Rulesets {
                     .execute(Request::delete(target.endpoint(&format!("rulesets/{id}"))))
                     .await
             }
+            // `PUT /rulesets/{id}` replaces the whole ruleset, so `diff` never
+            // needs a recreate.
+            Op::Recreate => unreachable!("rulesets are never recreated"),
         }
     }
 
