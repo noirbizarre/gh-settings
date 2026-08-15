@@ -3,7 +3,9 @@
 ## Status
 
 Accepted. Supersedes the placeholder recorded when this project was first
-scaffolded, which deferred the choice of release automation.
+scaffolded, which deferred the choice of release automation. Narrowed by
+[ADR-022](022-signed-release-commits.md), which replaced `SHIP_TOKEN` with a
+GitHub App.
 
 ## Context
 
@@ -48,7 +50,7 @@ Concretely:
 * `prepare-release.yaml` derives the next version with `git cliff
   --bumped-version`, writes the changelog, bumps `Cargo.toml`, regenerates the
   committed JSON Schema, and emits the artifact;
-* `publish-release.yaml` cross-compiles six targets and attaches them, named
+* `publish-release.yaml` cross-compiles seven targets and attaches them, named
   `gh-settings_<tag>_<os>-<arch>`, to the release gh-ship has already created as
   a **draft**;
 * `ship.yaml` drives both halves: `gh ship prepare` on push to main, `gh ship
@@ -58,8 +60,10 @@ Releases are drafted first so the assets land before anyone is notified. An
 extension announced before its binaries exist is an extension nobody can
 install.
 
-`SHIP_TOKEN` lives in a `release` environment, because `GITHUB_TOKEN` cannot
-trigger the CI that should run on the Release PR.
+The release credentials live in a `release` environment, because `GITHUB_TOKEN`
+cannot trigger the CI that should run on the Release PR. This ADR originally put
+a `SHIP_TOKEN` PAT there; [ADR-022](022-signed-release-commits.md) replaced it
+with a GitHub App.
 
 ## Consequences
 
@@ -72,6 +76,7 @@ trigger the CI that should run on the Release PR.
 * We depend on another young extension of our own. That is deliberate
   dogfooding; the fallback, a hand-written workflow, is well understood and the
   protocol is a single JSON file, so the escape hatch stays cheap.
-* Requires a `release` environment holding `SHIP_TOKEN` before the first
-  release. Without it the workflows fall back to `GITHUB_TOKEN` and the Release
-  PR gets no CI.
+* Requires a `release` environment holding the release credentials before the
+  first release. Without them the workflows fall back to `GITHUB_TOKEN` and the
+  Release PR gets no CI. See [ADR-022](022-signed-release-commits.md) for what
+  those credentials are now.

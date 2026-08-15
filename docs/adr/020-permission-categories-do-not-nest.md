@@ -36,8 +36,10 @@ resource by analogy with a resource that looks similar.
 Where the reference does not settle a mapping — several endpoints are listed
 under two permissions with a marker that means either "both" or "either" — the
 minimal sufficient claim is declared and marked `Confidence::Unverified`, which
-carries a footnote into the docs and an admission into `doctor`. `pages` is
-currently the only one.
+carries a footnote into the docs and an admission into `doctor`. `actions` is
+currently the only one — see [ADR-021](021-actions-settings.md), which is where
+that entry came from; `pages` was the original example and has since been
+settled by its `X-Accepted-GitHub-Permissions` header.
 
 ## Consequences
 
