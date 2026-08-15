@@ -180,7 +180,7 @@ repository. Several are destructive.
 - [x] Run any `sync` **twice**; the second must report "up to date" — this is
       what caught the ruleset permanent diff
 - [ ] `doctor` inside GitHub Actions with `secrets.GITHUB_TOKEN` — should report
-      labels-only and say why
+      labels and Pages as manageable, everything else refused, and say why
 - [ ] `gh extension install noirbizarre/gh-settings` on a clean machine
 
 A `422` means a payload-shape bug, and GitHub will not say which field.

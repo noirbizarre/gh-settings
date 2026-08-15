@@ -16,7 +16,8 @@ inputs:
       Token used to talk to GitHub.
 
       The default is the workflow's own GITHUB_TOKEN, which is enough for
-      `validate` and for labels — and nothing else. Repository settings,
+      `validate`, for labels and for Pages — and nothing else. Repository
+      settings,
       topics, autolinks, rulesets and environments need `Administration:
       write`, and variables need `Variables: write`. The workflow
       `permissions:` block cannot grant either, because it has no key for
