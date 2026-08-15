@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::config::{Finding, Settings};
 use crate::diff::diff_keyed;
@@ -360,13 +360,9 @@ impl Resource for Variables {
             return Ok(None);
         }
 
-        Ok(Some(Value::Array(
-            current
-                .variables
-                .values()
-                .map(|variable| json!({ "name": variable.name, "value": variable.value }))
-                .collect(),
-        )))
+        let variables: Vec<_> = current.variables.values().collect();
+
+        Ok(Some(serde_json::to_value(variables).unwrap_or(Value::Null)))
     }
 }
 
