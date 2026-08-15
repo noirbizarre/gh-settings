@@ -111,7 +111,7 @@ produces a standalone `gh-settings` binary rather than a `gh` subcommand, so the
 # Generate a configuration file from a repository you already have
 gh settings export
 
-# Check it, without touching the network
+# Check it, without touching the network — unless it uses `extends:`
 gh settings validate
 
 # See what would change
@@ -357,6 +357,7 @@ Resources
   ✔ autolinks
   ✔ rulesets
   ✔ environments
+  ✔ actions
   ✔ variables
   ✔ pages
 ```

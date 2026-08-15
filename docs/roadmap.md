@@ -45,7 +45,7 @@ reason stops applying.
 ### Verification
 
 - [x] **A live test suite** against a real throwaway repository, `#[ignore]`d
-      and gated on `GH_SETTINGS_TEST_REPO`. Thirteen tests covering each resource's
+      and gated on `GH_SETTINGS_TEST_REPO`. Covers each resource's
       create → update → prune cycle, re-planning after every mutation, plus one
       that asks GitHub which permissions each endpoint really requires. Runs on
       every push to `main` that touches the code, nightly, and on demand;
@@ -128,8 +128,10 @@ cannot disagree about what a token can do.
 - [ ] Installation page with per-platform notes and upgrading.
 - [ ] Quick start: export → validate → plan → sync on an existing repository.
 - [ ] Migration guide from `safe-settings` — what is read, what has to be
-      removed before the file will parse (org-level `suborgs`/`overrides`,
-      `branches`, `collaborators`), and above all that **pruning is off by
+      removed before the file will parse (org-level `suborgs`/`overrides`, and
+      the sections listed in [ADR-006](adr/006-safe-settings-compatibility.md):
+      `branches`, `collaborators`, `teams`, `milestones`), and above all that
+      **pruning is off by
       default**, so the first run is non-destructive. The README and the index
       both say so; what is missing is the step-by-step.
 - [ ] FAQ: why not safe-settings, why no secrets, why a `403`, why a PAT in CI.

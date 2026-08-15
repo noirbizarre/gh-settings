@@ -129,9 +129,9 @@ run = "gh ship validate"
 [tasks."docs:reference"]
 description = "Regenerate every document derived from the code"
 # The configuration reference comes from the JSON Schema, which itself comes
-# from the Rust types; the CLI reference and the permission table come straight
-# from the code. All three are committed and checked in CI, so documentation
-# that describes the code cannot drift from it.
+# from the Rust types; the CLI reference, the permission table and the action
+# inputs table come straight from the code. All four are committed and checked
+# in CI, so documentation that describes the code cannot drift from it.
 run = """
 cargo run --quiet -- schema | python3 scripts/gen-reference.py > docs/configuration.md
 cargo run --quiet -- internal cli > docs/cli.md
