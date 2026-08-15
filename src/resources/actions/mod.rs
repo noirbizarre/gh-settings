@@ -544,9 +544,9 @@ impl Resource for Actions {
         target: &Target,
         change: &Change,
     ) -> GitHubResult<()> {
-        let payload: Payload = change
-            .decode()
-            .unwrap_or_else(|error| panic!("actions change carried an undecodable payload: {error}"));
+        let payload: Payload = change.decode().unwrap_or_else(|error| {
+            panic!("actions change carried an undecodable payload: {error}")
+        });
 
         client
             .execute(Request::put(

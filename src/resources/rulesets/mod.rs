@@ -246,9 +246,9 @@ impl Resource for Rulesets {
         target: &Target,
         change: &Change,
     ) -> GitHubResult<()> {
-        let payload: Payload = change
-            .decode()
-            .unwrap_or_else(|error| panic!("ruleset change carried an undecodable payload: {error}"));
+        let payload: Payload = change.decode().unwrap_or_else(|error| {
+            panic!("ruleset change carried an undecodable payload: {error}")
+        });
 
         match change.op {
             Op::Create => {
