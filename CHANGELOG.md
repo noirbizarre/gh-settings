@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/noirbizarre/gh-settings/compare/0.3.0..0.3.1) - 2026-08-19
+
+### 🏗️ Build
+
+- **deps** Bump the rust-dependencies group with 3 updates ([#6](https://github.com/noirbizarre/gh-settings/issues/6)) - ([ad45ed2](https://github.com/noirbizarre/gh-settings/commit/ad45ed242d8304085c87498a1aa658476fbff64f))
+
+## ❤️ New Contributors
+
+* @dependabot[bot] made their first contribution in [#6](https://github.com/noirbizarre/gh-settings/pull/6)
 ## [0.3.0](https://github.com/noirbizarre/gh-settings/compare/0.2.0..0.3.0) - 2026-08-15
 
 ### 💫 Features
