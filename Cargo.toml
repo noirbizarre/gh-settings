@@ -59,7 +59,7 @@ serde_json = "1"
 serde_norway = "0.9"
 # `saphyr` is parsed *in addition* to serde, purely to build a byte-span index so
 # that diagnostics can underline the exact offending node. See ADR-008.
-saphyr = "0.0.11"
+saphyr = "0.0.12"
 # Gives us the serde path (`repository.description`) of a deserialization failure,
 # which we then resolve against the span index.
 serde_path_to_error = "0.1"
