@@ -160,6 +160,31 @@ fn security_uses_the_status_object_shape() {
 }
 
 #[test]
+fn security_supports_the_current_code_security_features() {
+    let changes = plan(
+        "security:\n  code_security: true\n  secret_scanning_non_provider_patterns: true\n  secret_scanning_ai_detection: false\n  secret_scanning_delegated_alert_dismissal: true\n  secret_scanning_delegated_bypass: false",
+        json!({"security_and_analysis": {
+            "code_security": {"status": "disabled"},
+            "secret_scanning_non_provider_patterns": {"status": "disabled"},
+            "secret_scanning_ai_detection": {"status": "enabled"},
+            "secret_scanning_delegated_alert_dismissal": {"status": "disabled"},
+            "secret_scanning_delegated_bypass": {"status": "enabled"}
+        }}),
+    );
+    assert_eq!(changes.len(), 1);
+    assert_eq!(
+        body(&changes[0]),
+        json!({"security_and_analysis": {
+            "code_security": {"status": "enabled"},
+            "secret_scanning_non_provider_patterns": {"status": "enabled"},
+            "secret_scanning_ai_detection": {"status": "disabled"},
+            "secret_scanning_delegated_alert_dismissal": {"status": "enabled"},
+            "secret_scanning_delegated_bypass": {"status": "disabled"}
+        }})
+    );
+}
+
+#[test]
 fn an_already_enabled_feature_produces_no_change() {
     assert!(
         plan(

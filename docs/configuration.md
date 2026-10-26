@@ -286,8 +286,13 @@ Security and analysis features.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `advanced_security` | boolean | no | Dependency graph advanced security (private repositories). |
+| `code_security` | boolean | no | GitHub Code Security (the standalone code-scanning product). |
 | `dependabot_security_updates` | boolean | no | Automatic Dependabot security fixes. |
 | `secret_scanning` | boolean | no | Secret scanning. |
+| `secret_scanning_ai_detection` | boolean | no | Secret scanning's AI-powered generic secret detection. |
+| `secret_scanning_delegated_alert_dismissal` | boolean | no | Delegated dismissal of secret-scanning alerts. |
+| `secret_scanning_delegated_bypass` | boolean | no | Delegated bypass of secret-scanning push protection. |
+| `secret_scanning_non_provider_patterns` | boolean | no | Secret scanning for non-provider patterns. |
 | `secret_scanning_push_protection` | boolean | no | Secret scanning push protection. |
 | `secret_scanning_validity_checks` | boolean | no | Secret scanning validity checks. |
 

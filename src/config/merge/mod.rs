@@ -317,11 +317,16 @@ fn merge_security(
     let c = child.unwrap_or_default();
 
     let SecuritySettings {
+        code_security,
         advanced_security,
         secret_scanning,
         secret_scanning_push_protection,
         dependabot_security_updates,
         secret_scanning_validity_checks,
+        secret_scanning_non_provider_patterns,
+        secret_scanning_ai_detection,
+        secret_scanning_delegated_alert_dismissal,
+        secret_scanning_delegated_bypass,
     } = c;
 
     macro_rules! field {
@@ -338,11 +343,18 @@ fn merge_security(
     }
 
     Some(SecuritySettings {
+        code_security: field!(code_security),
         advanced_security: field!(advanced_security),
         secret_scanning: field!(secret_scanning),
         secret_scanning_push_protection: field!(secret_scanning_push_protection),
         dependabot_security_updates: field!(dependabot_security_updates),
         secret_scanning_validity_checks: field!(secret_scanning_validity_checks),
+        secret_scanning_non_provider_patterns: field!(secret_scanning_non_provider_patterns),
+        secret_scanning_ai_detection: field!(secret_scanning_ai_detection),
+        secret_scanning_delegated_alert_dismissal: field!(
+            secret_scanning_delegated_alert_dismissal
+        ),
+        secret_scanning_delegated_bypass: field!(secret_scanning_delegated_bypass),
     })
 }
 

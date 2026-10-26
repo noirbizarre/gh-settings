@@ -218,6 +218,10 @@ pub enum MergeCommitMessage {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SecuritySettings {
+    /// GitHub Code Security (the standalone code-scanning product).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_security: Option<bool>,
+
     /// Dependency graph advanced security (private repositories).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advanced_security: Option<bool>,
@@ -237,12 +241,29 @@ pub struct SecuritySettings {
     /// Secret scanning validity checks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret_scanning_validity_checks: Option<bool>,
+
+    /// Secret scanning for non-provider patterns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_scanning_non_provider_patterns: Option<bool>,
+
+    /// Secret scanning's AI-powered generic secret detection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_scanning_ai_detection: Option<bool>,
+
+    /// Delegated dismissal of secret-scanning alerts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_scanning_delegated_alert_dismissal: Option<bool>,
+
+    /// Delegated bypass of secret-scanning push protection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_scanning_delegated_bypass: Option<bool>,
 }
 
 impl SecuritySettings {
     /// Every declared feature, as `(api_key, enabled)` pairs.
     pub fn declared(&self) -> Vec<(&'static str, bool)> {
         [
+            ("code_security", self.code_security),
             ("advanced_security", self.advanced_security),
             ("secret_scanning", self.secret_scanning),
             (
@@ -256,6 +277,22 @@ impl SecuritySettings {
             (
                 "secret_scanning_validity_checks",
                 self.secret_scanning_validity_checks,
+            ),
+            (
+                "secret_scanning_non_provider_patterns",
+                self.secret_scanning_non_provider_patterns,
+            ),
+            (
+                "secret_scanning_ai_detection",
+                self.secret_scanning_ai_detection,
+            ),
+            (
+                "secret_scanning_delegated_alert_dismissal",
+                self.secret_scanning_delegated_alert_dismissal,
+            ),
+            (
+                "secret_scanning_delegated_bypass",
+                self.secret_scanning_delegated_bypass,
             ),
         ]
         .into_iter()

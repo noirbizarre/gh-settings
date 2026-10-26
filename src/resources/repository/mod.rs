@@ -515,6 +515,9 @@ fn export_security(current: &Current) -> Option<SecuritySettings> {
         return None;
     }
     Some(SecuritySettings {
+        code_security: features
+            .contains_key("code_security")
+            .then(|| current.security_enabled("code_security")),
         advanced_security: features
             .contains_key("advanced_security")
             .then(|| current.security_enabled("advanced_security")),
@@ -530,6 +533,18 @@ fn export_security(current: &Current) -> Option<SecuritySettings> {
         secret_scanning_validity_checks: features
             .contains_key("secret_scanning_validity_checks")
             .then(|| current.security_enabled("secret_scanning_validity_checks")),
+        secret_scanning_non_provider_patterns: features
+            .contains_key("secret_scanning_non_provider_patterns")
+            .then(|| current.security_enabled("secret_scanning_non_provider_patterns")),
+        secret_scanning_ai_detection: features
+            .contains_key("secret_scanning_ai_detection")
+            .then(|| current.security_enabled("secret_scanning_ai_detection")),
+        secret_scanning_delegated_alert_dismissal: features
+            .contains_key("secret_scanning_delegated_alert_dismissal")
+            .then(|| current.security_enabled("secret_scanning_delegated_alert_dismissal")),
+        secret_scanning_delegated_bypass: features
+            .contains_key("secret_scanning_delegated_bypass")
+            .then(|| current.security_enabled("secret_scanning_delegated_bypass")),
     })
 }
 

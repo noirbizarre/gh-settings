@@ -167,8 +167,13 @@ repository:
   delete_branch_on_merge: true
   web_commit_signoff_required: true
   security:
+    code_security: true
     secret_scanning: true
     secret_scanning_push_protection: true
+    secret_scanning_non_provider_patterns: true
+    secret_scanning_ai_detection: true
+    secret_scanning_delegated_alert_dismissal: false
+    secret_scanning_delegated_bypass: false
 
 topics:
   - rust

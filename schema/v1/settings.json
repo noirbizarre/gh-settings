@@ -1067,6 +1067,13 @@
             "null"
           ]
         },
+        "code_security": {
+          "description": "GitHub Code Security (the standalone code-scanning product).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "dependabot_security_updates": {
           "description": "Automatic Dependabot security fixes.",
           "type": [
@@ -1076,6 +1083,34 @@
         },
         "secret_scanning": {
           "description": "Secret scanning.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secret_scanning_ai_detection": {
+          "description": "Secret scanning's AI-powered generic secret detection.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secret_scanning_delegated_alert_dismissal": {
+          "description": "Delegated dismissal of secret-scanning alerts.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secret_scanning_delegated_bypass": {
+          "description": "Delegated bypass of secret-scanning push protection.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secret_scanning_non_provider_patterns": {
+          "description": "Secret scanning for non-provider patterns.",
           "type": [
             "boolean",
             "null"
