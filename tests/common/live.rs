@@ -179,6 +179,7 @@ impl Live {
             .collect();
 
         const DEFAULTS: &[&str] = &[
+            "accessibility",
             "bug",
             "documentation",
             "duplicate",

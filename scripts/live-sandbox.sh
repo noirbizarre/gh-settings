@@ -190,8 +190,8 @@ done
 # Labels are the one resource GitHub creates for you, so "clean" means "only
 # the defaults". This list matches DEFAULTS in tests/common/live.rs.
 defaults=(
-  "bug" "documentation" "duplicate" "enhancement" "good first issue"
-  "help wanted" "invalid" "question" "wontfix"
+  "accessibility" "bug" "documentation" "duplicate" "enhancement"
+  "good first issue" "help wanted" "invalid" "question" "wontfix"
 )
 while IFS= read -r name; do
   [[ -n $name ]] || continue
