@@ -26,6 +26,7 @@ use super::source::SourceId;
 use super::spans::SpanIndex;
 use crate::config::Prunable;
 use crate::resources::actions::{ActionsSettings, ForkPrWorkflowsPrivateRepos, SelectedActions};
+use crate::resources::code_scanning::CodeScanningSettings;
 use crate::resources::labels::model::key as label_key;
 use crate::resources::pages::PagesSettings;
 use crate::resources::repository::{RepositorySettings, SecuritySettings};
@@ -59,6 +60,7 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
     let repository = merge_repository(&mut provenance, base, child);
     let pages = merge_pages(&mut provenance, base, child);
     let actions = merge_actions(&mut provenance, base, child);
+    let code_scanning = merge_code_scanning(&mut provenance, base, child);
 
     let topics = merge_section(
         &mut provenance,
@@ -125,6 +127,7 @@ pub fn merge(base: &Layer<'_>, child: &Layer<'_>) -> (Settings, Provenance) {
         variables,
         pages,
         actions,
+        code_scanning,
     };
 
     (settings, provenance)
@@ -295,6 +298,42 @@ fn merge_pages(
         source: field!(source),
         cname: field!(cname),
         https_enforced: field!(https_enforced),
+    })
+}
+
+/// Merge the code scanning section.
+///
+/// `default_setup` is taken whole rather than merged: `enabled` is not an
+/// `Option`, so a child overriding only the query suite would otherwise
+/// inherit an `enabled` it never mentioned. Same reasoning as `pages.source`.
+fn merge_code_scanning(
+    provenance: &mut Provenance,
+    base: &Layer<'_>,
+    child: &Layer<'_>,
+) -> Option<CodeScanningSettings> {
+    let base_section = base.settings.code_scanning.as_ref();
+    let child_section = child.settings.code_scanning.as_ref();
+
+    if base_section.is_none() && child_section.is_none() {
+        return None;
+    }
+
+    let empty = CodeScanningSettings::default();
+    let b = base_section.unwrap_or(&empty);
+    let c = child_section.unwrap_or(&empty);
+
+    // Exhaustive, with no `..`, for the same reason as `merge_repository`.
+    let CodeScanningSettings { default_setup } = c;
+
+    Some(CodeScanningSettings {
+        default_setup: pick(
+            provenance,
+            "code_scanning.default_setup",
+            base.id,
+            b.default_setup.as_ref(),
+            child.id,
+            default_setup.as_ref(),
+        ),
     })
 }
 

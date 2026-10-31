@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::resources::actions::ActionsSettings;
 use crate::resources::autolinks::Autolink;
+use crate::resources::code_scanning::CodeScanningSettings;
 use crate::resources::environments::Environment;
 use crate::resources::labels::Label;
 use crate::resources::pages::PagesSettings;
@@ -116,6 +117,13 @@ pub struct Settings {
     /// the default `GITHUB_TOKEN` permissions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actions: Option<ActionsSettings>,
+
+    /// Code scanning.
+    ///
+    /// Covers CodeQL default setup, which `default_setup.enabled` switches on
+    /// and off. An omitted section leaves code scanning as it is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_scanning: Option<CodeScanningSettings>,
 }
 
 impl Settings {
@@ -155,6 +163,7 @@ impl Settings {
             && self.variables.is_none()
             && self.pages.is_none()
             && self.actions.is_none()
+            && self.code_scanning.is_none()
     }
 
     /// Cross-section checks that no individual resource can perform.

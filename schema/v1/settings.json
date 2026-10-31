@@ -246,6 +246,24 @@
         }
       ]
     },
+    "CodeScanningSettings": {
+      "additionalProperties": false,
+      "description": "The `code_scanning` configuration section.\n\n```yaml\ncode_scanning:\n  default_setup:\n    enabled: true\n```",
+      "properties": {
+        "default_setup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefaultSetup"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "CodeQL default setup, which analyses the repository on GitHub's own\nworkflow without a workflow file.\n\nGitHub applies a change to the query suite, threat model or languages\nof a setup that is already enabled through a *CodeQL Setup* workflow\nrun, and reports the previous values until that run finishes. A plan\nmade in the meantime shows the change again.\n\nGitHub also accepts enabling it on a repository with no language CodeQL\ncan analyse, then reports no languages and does not start analysing\nwhen one is added. Enable it once the repository has code, or turn it\noff and on again after adding some."
+        }
+      },
+      "type": "object"
+    },
     "Conditions": {
       "additionalProperties": false,
       "description": "Which refs a ruleset applies to.",
@@ -262,6 +280,70 @@
           "description": "Ref name matching."
         }
       },
+      "type": "object"
+    },
+    "DefaultSetup": {
+      "additionalProperties": false,
+      "description": "CodeQL default setup.\n\n```yaml\ndefault_setup:\n  enabled: true\n  query_suite: extended\n  languages: [actions, python]\n```",
+      "properties": {
+        "enabled": {
+          "description": "Whether default setup is enabled.\n\n`false` turns it off, and the other fields are then ignored.",
+          "type": "boolean"
+        },
+        "languages": {
+          "description": "Languages to analyse, for example `actions`, `python` or\n`javascript-typescript`.\n\nOmit it to let GitHub analyse every supported language it detects.\n`javascript` and `typescript` both mean `javascript-typescript`; likewise\n`c` and `cpp` mean `c-cpp`, and `java` and `kotlin` mean `java-kotlin`.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "query_suite": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QuerySuite"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which CodeQL queries to run."
+        },
+        "runner_label": {
+          "description": "Label of the self-hosted runners to use, with `runner_type: labeled`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunnerType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which runners the analysis runs on."
+        },
+        "threat_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreatModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which sources of untrusted data CodeQL considers."
+        }
+      },
+      "required": [
+        "enabled"
+      ],
       "type": "object"
     },
     "DeploymentBranchPolicy": {
@@ -748,6 +830,21 @@
       ],
       "description": "A collection section that can opt into pruning."
     },
+    "QuerySuite": {
+      "description": "Which CodeQL queries default setup runs.",
+      "oneOf": [
+        {
+          "const": "default",
+          "description": "The default suite, tuned for a low false-positive rate.",
+          "type": "string"
+        },
+        {
+          "const": "extended",
+          "description": "The default suite plus lower-severity and lower-precision queries.",
+          "type": "string"
+        }
+      ]
+    },
     "RefNameCondition": {
       "additionalProperties": false,
       "description": "Ref name matching.",
@@ -1056,6 +1153,21 @@
       ],
       "type": "object"
     },
+    "RunnerType": {
+      "description": "Which runners default setup's analysis runs on.",
+      "oneOf": [
+        {
+          "const": "standard",
+          "description": "GitHub-hosted runners.",
+          "type": "string"
+        },
+        {
+          "const": "labeled",
+          "description": "Runners carrying the label named by `runner_label`.",
+          "type": "string"
+        }
+      ]
+    },
     "SecuritySettings": {
       "additionalProperties": false,
       "description": "Security and analysis features.\n\nThe API models these as `{ status: \"enabled\" | \"disabled\" }` objects rather\nthan booleans; the configuration exposes plain booleans and the resource\ntranslates.",
@@ -1205,6 +1317,21 @@
         }
       ]
     },
+    "ThreatModel": {
+      "description": "Which sources of untrusted data CodeQL considers.",
+      "oneOf": [
+        {
+          "const": "remote",
+          "description": "Remote sources only, such as network requests.",
+          "type": "string"
+        },
+        {
+          "const": "remote_and_local",
+          "description": "Remote sources and local ones, such as files and environment variables.",
+          "type": "string"
+        }
+      ]
+    },
     "Variable": {
       "additionalProperties": false,
       "description": "A single Actions variable.",
@@ -1266,6 +1393,17 @@
         }
       ],
       "description": "Autolink references."
+    },
+    "code_scanning": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodeScanningSettings"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Code scanning.\n\nCovers CodeQL default setup, which `default_setup.enabled` switches on\nand off. An omitted section leaves code scanning as it is."
     },
     "environments": {
       "anyOf": [

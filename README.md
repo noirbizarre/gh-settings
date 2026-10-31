@@ -240,6 +240,11 @@ pages:
     path: /
   cname: docs.example.com
   https_enforced: true
+
+code_scanning:
+  default_setup:
+    enabled: true
+    query_suite: extended
 ```
 
 Every section is **optional**, and an absent section is **unmanaged** — nothing
@@ -386,6 +391,7 @@ rather than a guess.
 | Actions variables, at repository and environment scope | ✅ |
 | Actions general settings (permissions, retention, fork PR approval) | ✅ |
 | GitHub Pages (source, custom domain, HTTPS) | ✅ |
+| Code scanning (CodeQL default setup) | ✅ |
 | Inheritance from a shared repository (`extends:`) | ✅ |
 
 Declaring a `pages:` section enables Pages; it is never turned back off, because

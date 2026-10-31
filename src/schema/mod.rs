@@ -111,6 +111,7 @@ mod tests {
             "variables",
             "pages",
             "actions",
+            "code_scanning",
         ] {
             assert!(properties.contains_key(section), "{section} is missing");
         }

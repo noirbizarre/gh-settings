@@ -6,9 +6,9 @@
 //! custom properties the same way.
 
 use crate::resources::{
-    ErasedResource, ResourceId, actions::Actions, autolinks::Autolinks, environments::Environments,
-    labels::Labels, pages::Pages, repository::Repository, rulesets::Rulesets, topics::Topics,
-    variables::Variables,
+    ErasedResource, ResourceId, actions::Actions, autolinks::Autolinks,
+    code_scanning::CodeScanning, environments::Environments, labels::Labels, pages::Pages,
+    repository::Repository, rulesets::Rulesets, topics::Topics, variables::Variables,
 };
 
 /// The ordered set of resources the engine orchestrates.
@@ -31,6 +31,7 @@ impl Default for Registry {
             Box::new(Actions),
             Box::new(Variables),
             Box::new(Pages),
+            Box::new(CodeScanning),
         ])
     }
 }
@@ -155,6 +156,7 @@ mod tests {
                 ResourceId::Actions,
                 ResourceId::Variables,
                 ResourceId::Pages,
+                ResourceId::CodeScanning,
             ]
         );
     }

@@ -15,6 +15,7 @@ pub mod requirement;
 
 pub mod actions;
 pub mod autolinks;
+pub mod code_scanning;
 pub mod environments;
 pub mod labels;
 pub mod pages;
@@ -58,6 +59,8 @@ pub enum ResourceId {
     Variables,
     /// GitHub Pages.
     Pages,
+    /// Code scanning: CodeQL default setup.
+    CodeScanning,
 }
 
 impl ResourceId {
@@ -72,6 +75,7 @@ impl ResourceId {
         Self::Actions,
         Self::Variables,
         Self::Pages,
+        Self::CodeScanning,
     ];
 
     /// The identifier as it appears in `--only`, plan output and JSON.
@@ -86,6 +90,7 @@ impl ResourceId {
             Self::Actions => "actions",
             Self::Variables => "variables",
             Self::Pages => "pages",
+            Self::CodeScanning => "code_scanning",
         }
     }
 
@@ -101,6 +106,7 @@ impl ResourceId {
             Self::Actions => "Actions",
             Self::Variables => "Variables",
             Self::Pages => "Pages",
+            Self::CodeScanning => "Code scanning",
         }
     }
 

@@ -193,6 +193,26 @@ fn live_repository_security_travels_in_its_own_request() {
 
 #[test]
 #[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_codeql_default_setup_enables_and_disables() {
+    let live = live_or_skip!();
+
+    // Only `enabled`: turning the setup on or off reads back at once, while a
+    // query suite or language change waits for the setup run GitHub starts,
+    // so a re-plan straight after it would race that run. Off last, so the
+    // sandbox ends as it began.
+    for enabled in [true, false] {
+        live.config(&only(&format!(
+            "code_scanning:\n  default_setup:\n    enabled: {enabled}\n"
+        )));
+        live.run(&["sync", "--yes", "--only", "code_scanning"])
+            .expect_status(0);
+        live.run(&["plan", "--only", "code_scanning"])
+            .expect_up_to_date();
+    }
+}
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
 fn live_export_round_trips_to_an_empty_plan() {
     // The migration promise: point it at a repository, export, and the result
     // must describe that repository exactly.

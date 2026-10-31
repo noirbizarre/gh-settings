@@ -1806,3 +1806,56 @@ fn actions_endpoints_that_do_not_apply_are_not_read_as_failures() {
         output.stderr
     );
 }
+
+const NEVER_CONFIGURED: &str = r#"{
+    "state": "not-configured",
+    "languages": ["actions", "python"],
+    "query_suite": "default",
+    "threat_model": "remote",
+    "runner_type": "standard",
+    "runner_label": null
+}"#;
+
+#[test]
+fn sync_enables_codeql_default_setup_with_one_patch() {
+    let runner = Sandbox::new()
+        .config("version: 1\ncode_scanning:\n  default_setup:\n    enabled: true\n    query_suite: extended\n")
+        .get("repos/o/r/code-scanning/default-setup", NEVER_CONFIGURED)
+        .respond(
+            "PATCH",
+            "repos/o/r/code-scanning/default-setup",
+            Fixture {
+                status: 202,
+                ..Fixture::ok(r#"{"run_id": 1, "run_url": ""}"#)
+            },
+        )
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(
+        writes[0].starts_with("PATCH repos/o/r/code-scanning/default-setup"),
+        "{writes:?}"
+    );
+    let body = body_of(writes[0]);
+    assert_eq!(body["state"], "configured", "{body}");
+    assert_eq!(body["query_suite"], "extended", "{body}");
+}
+
+#[test]
+fn plan_does_not_read_code_scanning_when_it_is_unmanaged() {
+    let runner = Sandbox::new()
+        .config("version: 1\nlabels:\n  - name: bug\n    color: d73a4a\n")
+        .get("repos/o/r/labels", LABELS)
+        .build();
+
+    let output = runner.run(&["plan", "-R", "o/r"]);
+    assert!(
+        !output.requests.iter().any(|r| r.contains("code-scanning")),
+        "read code scanning despite it being unmanaged: {:?}",
+        output.requests
+    );
+}

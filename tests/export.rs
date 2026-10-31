@@ -509,3 +509,44 @@ fn an_exported_actions_section_plans_nothing() {
         output.stdout
     );
 }
+
+#[test]
+fn an_enabled_codeql_default_setup_exports_and_round_trips() {
+    // GitHub reads `javascript-typescript` back under three names; the export
+    // must fold them, or the round trip would plan a change.
+    let runner = populated()
+        .get(
+            "repos/o/r/code-scanning/default-setup",
+            r#"{"state": "configured", "languages": ["javascript", "javascript-typescript", "typescript"], "query_suite": "extended", "threat_model": "remote", "runner_type": "standard", "runner_label": ""}"#,
+        )
+        .build();
+
+    runner
+        .run(&["export", "-R", "o/r", "--force"])
+        .expect_status(0);
+
+    let written = common::read(runner.path(), ".github/settings.yml");
+    assert!(written.contains("code_scanning:"), "{written}");
+    assert!(written.contains("- javascript-typescript"), "{written}");
+    assert!(!written.contains("- typescript"), "{written}");
+
+    runner.run(&["plan", "-R", "o/r"]).expect_status(0);
+}
+
+#[test]
+fn a_disabled_codeql_default_setup_exports_nothing() {
+    let runner = populated()
+        .get(
+            "repos/o/r/code-scanning/default-setup",
+            r#"{"state": "not-configured", "languages": ["python"], "query_suite": "default"}"#,
+        )
+        .build();
+
+    let output = runner.run(&["export", "-R", "o/r", "--stdout"]);
+    output.expect_status(0);
+    assert!(
+        !output.stdout.contains("code_scanning"),
+        "{}",
+        output.stdout
+    );
+}

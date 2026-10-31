@@ -238,6 +238,16 @@ elif api "repos/$repo/pages" >/dev/null 2>&1; then
   fi
 fi
 
+# Like the Actions settings below, CodeQL default setup has a value rather than
+# an existence, so the pre-flight cannot see a run that left it enabled.
+if [[ "$(api "repos/$repo/code-scanning/default-setup" --jq .state 2>/dev/null || true)" == configured ]]; then
+  if try "disabling CodeQL default setup" \
+    gh api "repos/$repo/code-scanning/default-setup" --method PATCH \
+      --field state=not-configured --silent; then
+    echo "disabled CodeQL default setup"
+  fi
+fi
+
 if try "clearing description and homepage" \
   gh api "repos/$repo" --method PATCH --field description= --field homepage= --silent; then
   echo "cleared description and homepage"
