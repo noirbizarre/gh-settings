@@ -14,7 +14,7 @@ eventually be manageable here.*
 | Resource | Status | Notes |
 |---|---|---|
 | Repository metadata | ✅ | description, homepage, features, merge strategies, commit title/message, default branch |
-| Repository security | ✅ | secret scanning, push protection, Dependabot updates, advanced security |
+| Repository security | ✅ | secret scanning, push protection, Dependabot updates, advanced security, private vulnerability reporting |
 | Topics | ✅ | |
 | Labels | ✅ | including renames, which preserve issue assignments |
 | Autolinks | ✅ | changes are delete-and-recreate; GitHub has no update endpoint |

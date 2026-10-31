@@ -237,10 +237,19 @@ pub struct SecuritySettings {
     /// Secret scanning validity checks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret_scanning_validity_checks: Option<bool>,
+
+    /// Private vulnerability reporting, which lets anyone report a security
+    /// vulnerability to the maintainers privately.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub private_vulnerability_reporting: Option<bool>,
 }
 
 impl SecuritySettings {
-    /// Every declared feature, as `(api_key, enabled)` pairs.
+    /// Every declared `security_and_analysis` feature, as `(api_key, enabled)`
+    /// pairs.
+    ///
+    /// `private_vulnerability_reporting` is not one of them: GitHub manages it
+    /// through its own endpoint, so the resource diffs it separately.
     pub fn declared(&self) -> Vec<(&'static str, bool)> {
         [
             ("advanced_security", self.advanced_security),
@@ -483,6 +492,7 @@ mod tests {
         let security = SecuritySettings {
             secret_scanning: Some(true),
             advanced_security: Some(false),
+            private_vulnerability_reporting: Some(true),
             ..Default::default()
         };
         assert_eq!(

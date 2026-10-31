@@ -287,6 +287,7 @@ Security and analysis features.
 |---|---|---|---|
 | `advanced_security` | boolean | no | Dependency graph advanced security (private repositories). |
 | `dependabot_security_updates` | boolean | no | Automatic Dependabot security fixes. |
+| `private_vulnerability_reporting` | boolean | no | Private vulnerability reporting, which lets anyone report a security vulnerability to the maintainers privately. |
 | `secret_scanning` | boolean | no | Secret scanning. |
 | `secret_scanning_push_protection` | boolean | no | Secret scanning push protection. |
 | `secret_scanning_validity_checks` | boolean | no | Secret scanning validity checks. |

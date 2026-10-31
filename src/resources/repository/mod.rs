@@ -1,9 +1,10 @@
 //! Repository metadata.
 //!
 //! A singleton resource: rather than a collection of items, it produces at most
-//! two changes — one `PATCH /repos/{owner}/{repo}` covering the plain fields, and
-//! one per security feature, which GitHub exposes through a differently shaped
-//! sub-object.
+//! three changes — one `PATCH /repos/{owner}/{repo}` covering the plain fields,
+//! one for the security features GitHub exposes through a differently shaped
+//! sub-object, and one for private vulnerability reporting, which has an
+//! endpoint of its own.
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -103,6 +104,21 @@ pub struct Current {
     /// Security and analysis features.
     #[serde(default)]
     pub security_and_analysis: Option<Map<String, Value>>,
+    /// Whether private vulnerability reporting is enabled.
+    ///
+    /// Not part of the repository object: [`Repository::current`] reads it from
+    /// `GET /repos/{owner}/{repo}/private-vulnerability-reporting` and fills it
+    /// in. `None` when GitHub did not report it, which is a different claim
+    /// from reporting it disabled.
+    #[serde(skip)]
+    pub private_vulnerability_reporting: Option<bool>,
+}
+
+/// The private vulnerability reporting endpoint's answer.
+#[derive(Debug, Clone, Default, Deserialize)]
+struct PrivateVulnerabilityReportingState {
+    #[serde(default)]
+    enabled: Option<bool>,
 }
 
 impl Current {
@@ -161,6 +177,12 @@ pub enum Payload {
     Settings(Value),
     /// A `PATCH` targeting `security_and_analysis`.
     Security(Value),
+    /// A `PUT` (enable) or `DELETE` (disable) of
+    /// `private-vulnerability-reporting`.
+    PrivateVulnerabilityReporting {
+        /// Whether to enable it.
+        enabled: bool,
+    },
 }
 
 #[async_trait]
@@ -189,7 +211,15 @@ impl Resource for Repository {
         client: &dyn GitHubClient,
         target: &Target,
     ) -> GitHubResult<Self::Current> {
-        let current: Current = client.send(Request::get(target.endpoint(""))).await?;
+        let mut current: Current = client.send(Request::get(target.endpoint(""))).await?;
+        // `send_optional` because the endpoint may not exist at all, as on an
+        // older GitHub Enterprise Server; `None` then means "not reported".
+        let reporting: Option<PrivateVulnerabilityReportingState> = client
+            .send_optional(Request::get(
+                target.endpoint("private-vulnerability-reporting"),
+            ))
+            .await?;
+        current.private_vulnerability_reporting = reporting.and_then(|state| state.enabled);
         Ok(current.normalized())
     }
 
@@ -426,6 +456,35 @@ impl Resource for Repository {
                         )),
                 );
             }
+
+            // A declared setting GitHub did not report still produces a change:
+            // claiming it is up to date would be a convergence nobody observed,
+            // and applying it surfaces GitHub's own answer.
+            if let Some(enabled) = security.private_vulnerability_reporting
+                && current.private_vulnerability_reporting != Some(enabled)
+            {
+                changes.push(
+                    Change::new(
+                        ResourceId::Repository,
+                        Op::Update,
+                        "private_vulnerability_reporting",
+                    )
+                    .summary(if enabled {
+                        "enable private vulnerability reporting"
+                    } else {
+                        "disable private vulnerability reporting"
+                    })
+                    .fields(vec![FieldDiff::changed(
+                        "private_vulnerability_reporting",
+                        current
+                            .private_vulnerability_reporting
+                            .map(|value| value.to_string())
+                            .unwrap_or_else(|| "(not reported)".into()),
+                        enabled.to_string(),
+                    )])
+                    .payload(Payload::PrivateVulnerabilityReporting { enabled }),
+                );
+            }
         }
 
         changes
@@ -443,6 +502,17 @@ impl Resource for Repository {
 
         let body = match payload {
             Payload::Settings(body) | Payload::Security(body) => body,
+            // The endpoint takes no body: enabling is a `PUT`, disabling a
+            // `DELETE`.
+            Payload::PrivateVulnerabilityReporting { enabled } => {
+                let endpoint = target.endpoint("private-vulnerability-reporting");
+                let request = if enabled {
+                    Request::put(endpoint, json!({}))
+                } else {
+                    Request::delete(endpoint)
+                };
+                return client.execute(request).await;
+            }
         };
 
         client
@@ -510,8 +580,9 @@ impl Resource for Repository {
 
 /// Export the security block, omitting it when the API reported nothing.
 fn export_security(current: &Current) -> Option<SecuritySettings> {
-    let features = current.security_and_analysis.as_ref()?;
-    if features.is_empty() {
+    let empty = Map::new();
+    let features = current.security_and_analysis.as_ref().unwrap_or(&empty);
+    if features.is_empty() && current.private_vulnerability_reporting.is_none() {
         return None;
     }
     Some(SecuritySettings {
@@ -530,6 +601,7 @@ fn export_security(current: &Current) -> Option<SecuritySettings> {
         secret_scanning_validity_checks: features
             .contains_key("secret_scanning_validity_checks")
             .then(|| current.security_enabled("secret_scanning_validity_checks")),
+        private_vulnerability_reporting: current.private_vulnerability_reporting,
     })
 }
 
