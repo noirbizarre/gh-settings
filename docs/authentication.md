@@ -193,11 +193,12 @@ actually enforces.
 | `actions` | Metadata: read, Administration: write, Actions policies: write † | `repo` | ✘ |
 | `variables` | Metadata: read, Actions: read, Variables: write, Environments: write | `repo` | ✘ |
 | `pages` | Metadata: read, Pages: write, Administration: write | `repo` | ✔ |
+| `code_scanning` | Metadata: read, Administration: write | `repo` | ✘ |
 | `extends` | Contents: read | `repo` | ✘ |
 
 † GitHub's own reference does not settle this mapping — it is either absent or ambiguous there, so this is our best understanding and the minimal claim, not a guarantee. `gh settings doctor` will tell you what your token can actually do.
 
-`repository`, `topics`, `autolinks`, `rulesets`, `environments` and `actions` require Administration: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
+`repository`, `topics`, `autolinks`, `rulesets`, `environments`, `actions` and `code_scanning` require Administration: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
 
 `variables` requires Variables: write, which cannot be granted to GITHUB_TOKEN — the workflow `permissions:` block has no key that grants it. Use a personal access token or a GitHub App token.
 

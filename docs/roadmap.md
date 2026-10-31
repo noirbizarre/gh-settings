@@ -24,6 +24,7 @@ eventually be manageable here.*
 | Actions general settings | ✅ | allowed actions, workflow permissions, artifact and log retention, fork PR approval |
 | Actions variables | ✅ | repository and environment scope; values are readable, so they diff |
 | Pages | ✅ | build type, source, custom domain and HTTPS; declaring the section enables the site, nothing ever disables it. The `public` flag is reported by the API but not settable through it, so it is not offered |
+| Code scanning | ✅ | CodeQL default setup: query suite, threat model, languages and runners. A changed query suite, threat model or added language reads back only once the setup run GitHub starts has finished |
 | Custom properties | planned | |
 | Webhooks | planned | |
 | Collaborators & teams | planned | |

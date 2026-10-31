@@ -397,3 +397,34 @@ fn pages_are_unmanaged_when_neither_document_declares_them() {
     let (settings, _, _) = merged("labels: []\n", "topics: []\n");
     assert!(settings.pages.is_none());
 }
+
+// --- code scanning ----------------------------------------------------------
+
+#[test]
+fn an_inherited_default_setup_is_available_to_a_child_that_declares_none() {
+    let (settings, _, _) = merged(
+        "code_scanning:\n  default_setup:\n    enabled: true\n",
+        "labels: []\n",
+    );
+    let setup = settings.code_scanning.unwrap().default_setup.unwrap();
+    assert!(setup.enabled);
+}
+
+#[test]
+fn an_inherited_default_setup_is_replaced_whole_rather_than_field_by_field() {
+    // `enabled` is not an `Option`, so a child redeclaring the setup states
+    // all of it: here, a base's query suite does not survive the override.
+    let (settings, _, _) = merged(
+        "code_scanning:\n  default_setup:\n    enabled: true\n    query_suite: extended\n",
+        "code_scanning:\n  default_setup:\n    enabled: true\n    languages: [python]\n",
+    );
+    let setup = settings.code_scanning.unwrap().default_setup.unwrap();
+    assert_eq!(setup.query_suite, None);
+    assert_eq!(setup.languages, Some(vec!["python".to_string()]));
+}
+
+#[test]
+fn code_scanning_is_unmanaged_when_neither_document_declares_it() {
+    let (settings, _, _) = merged("labels: []\n", "topics: []\n");
+    assert!(settings.code_scanning.is_none());
+}

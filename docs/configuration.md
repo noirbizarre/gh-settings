@@ -84,6 +84,43 @@ A single autolink reference.
 | `url_template` | string | yes | Target URL, containing the `<num>` placeholder. |
 
 
+## `code_scanning`
+
+Code scanning.
+
+Covers CodeQL default setup, which `default_setup.enabled` switches on
+and off. An omitted section leaves code scanning as it is.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `default_setup` | object | no | CodeQL default setup, which analyses the repository on GitHub's own workflow without a workflow file. |
+
+
+### `code_scanning.default_setup`
+
+CodeQL default setup, which analyses the repository on GitHub's own
+workflow without a workflow file.
+
+GitHub applies a change to the query suite, threat model or languages
+of a setup that is already enabled through a *CodeQL Setup* workflow
+run, and reports the previous values until that run finishes. A plan
+made in the meantime shows the change again.
+
+GitHub also accepts enabling it on a repository with no language CodeQL
+can analyse, then reports no languages and does not start analysing
+when one is added. Enable it once the repository has code, or turn it
+off and on again after adding some.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `enabled` | boolean | yes | Whether default setup is enabled. |
+| `languages` | list of string | no | Languages to analyse, for example `actions`, `python` or `javascript-typescript`. |
+| `query_suite` | `default` \| `extended` | no | Which CodeQL queries to run. |
+| `runner_label` | string | no | Label of the self-hosted runners to use, with `runner_type: labeled`. |
+| `runner_type` | `standard` \| `labeled` | no | Which runners the analysis runs on. |
+| `threat_model` | `remote` \| `remote_and_local` | no | Which sources of untrusted data CodeQL considers. |
+
+
 ## `environments`
 
 Deployment environments and their protection rules.
