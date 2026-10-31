@@ -193,6 +193,27 @@ fn live_repository_security_travels_in_its_own_request() {
 
 #[test]
 #[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
+fn live_private_vulnerability_reporting_round_trips() {
+    let live = live_or_skip!();
+
+    // Its endpoint takes no body: enabling is a PUT and disabling a DELETE.
+    // Both directions, in that order, so the sandbox ends as it began.
+    for enabled in [true, false] {
+        live.config(&only(&format!(
+            "repository:
+  security:
+    private_vulnerability_reporting: {enabled}
+"
+        )));
+        live.run(&["sync", "--yes", "--only", "repository"])
+            .expect_status(0);
+        live.run(&["plan", "--only", "repository"])
+            .expect_up_to_date();
+    }
+}
+
+#[test]
+#[ignore = "live: requires GH_SETTINGS_TEST_REPO"]
 fn live_export_round_trips_to_an_empty_plan() {
     // The migration promise: point it at a repository, export, and the result
     // must describe that repository exactly.

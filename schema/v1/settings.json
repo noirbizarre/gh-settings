@@ -1074,6 +1074,13 @@
             "null"
           ]
         },
+        "private_vulnerability_reporting": {
+          "description": "Private vulnerability reporting, which lets anyone report a security\nvulnerability to the maintainers privately.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "secret_scanning": {
           "description": "Secret scanning.",
           "type": [

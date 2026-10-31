@@ -1806,3 +1806,65 @@ fn actions_endpoints_that_do_not_apply_are_not_read_as_failures() {
         output.stderr
     );
 }
+
+#[test]
+fn private_vulnerability_reporting_is_enabled_through_its_own_endpoint() {
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  security:\n    private_vulnerability_reporting: true\n")
+        .repository(&default_repository())
+        .get(
+            "repos/o/r/private-vulnerability-reporting",
+            r#"{"enabled": false}"#,
+        )
+        .accept("PUT", "repos/o/r/private-vulnerability-reporting")
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(
+        writes[0].starts_with("PUT repos/o/r/private-vulnerability-reporting"),
+        "{writes:?}"
+    );
+}
+
+#[test]
+fn private_vulnerability_reporting_is_disabled_with_a_delete() {
+    let runner = Sandbox::new()
+        .config(
+            "version: 1\nrepository:\n  security:\n    private_vulnerability_reporting: false\n",
+        )
+        .repository(&default_repository())
+        .get(
+            "repos/o/r/private-vulnerability-reporting",
+            r#"{"enabled": true}"#,
+        )
+        .accept("DELETE", "repos/o/r/private-vulnerability-reporting")
+        .build();
+
+    let output = runner.run(&["sync", "-R", "o/r", "--yes"]);
+    output.expect_status(0);
+
+    let writes = output.writes();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(
+        writes[0].starts_with("DELETE repos/o/r/private-vulnerability-reporting"),
+        "{writes:?}"
+    );
+}
+
+#[test]
+fn private_vulnerability_reporting_already_enabled_is_up_to_date() {
+    let runner = Sandbox::new()
+        .config("version: 1\nrepository:\n  security:\n    private_vulnerability_reporting: true\n")
+        .repository(&default_repository())
+        .get(
+            "repos/o/r/private-vulnerability-reporting",
+            r#"{"enabled": true}"#,
+        )
+        .build();
+
+    runner.run(&["plan", "-R", "o/r"]).expect_status(0);
+}

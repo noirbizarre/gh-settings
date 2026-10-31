@@ -28,7 +28,26 @@ fn plan(desired_source: &str, current_value: Value) -> Vec<Change> {
 fn body(change: &Change) -> Value {
     match change.decode::<Payload>().unwrap() {
         Payload::Settings(body) | Payload::Security(body) => body,
+        Payload::PrivateVulnerabilityReporting { enabled } => json!(enabled),
     }
+}
+
+/// A current state with private vulnerability reporting as GitHub reported it.
+///
+/// Set after deserialising, as the real `current()` does: the repository
+/// object never carries the field.
+fn current_with_reporting(value: Value, reporting: Option<bool>) -> Current {
+    let mut current = current(value);
+    current.private_vulnerability_reporting = reporting;
+    current
+}
+
+fn plan_with_reporting(desired_source: &str, reporting: Option<bool>) -> Vec<Change> {
+    Repository.diff(
+        &desired(desired_source),
+        &current_with_reporting(json!({}), reporting),
+        &PruneOpts::default(),
+    )
 }
 
 #[test]
@@ -300,4 +319,103 @@ fn web_commit_signoff_is_required_when_declared() {
         body(&changes[0])["web_commit_signoff_required"],
         json!(true)
     );
+}
+
+#[test]
+fn private_vulnerability_reporting_travels_in_its_own_request() {
+    // It has its own endpoint, so it can share a body with neither the
+    // repository PATCH nor `security_and_analysis`.
+    let changes = Repository.diff(
+        &desired(
+            "description: new\nsecurity:\n  secret_scanning: true\n  private_vulnerability_reporting: true",
+        ),
+        &current_with_reporting(
+            json!({
+                "description": "old",
+                "security_and_analysis": {"secret_scanning": {"status": "disabled"}}
+            }),
+            Some(false),
+        ),
+        &PruneOpts::default(),
+    );
+    assert_eq!(changes.len(), 3);
+    assert_eq!(
+        changes[2].decode::<Payload>().unwrap(),
+        Payload::PrivateVulnerabilityReporting { enabled: true }
+    );
+    assert!(
+        body(&changes[1])["security_and_analysis"]
+            .get("private_vulnerability_reporting")
+            .is_none(),
+        "private vulnerability reporting leaked into security_and_analysis"
+    );
+}
+
+#[test]
+fn enabling_private_vulnerability_reporting_is_planned() {
+    let changes = plan_with_reporting(
+        "security:\n  private_vulnerability_reporting: true",
+        Some(false),
+    );
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0].op, Op::Update);
+    assert_eq!(changes[0].summary, "enable private vulnerability reporting");
+    assert_eq!(
+        changes[0].decode::<Payload>().unwrap(),
+        Payload::PrivateVulnerabilityReporting { enabled: true }
+    );
+}
+
+#[test]
+fn disabling_private_vulnerability_reporting_is_planned() {
+    let changes = plan_with_reporting(
+        "security:\n  private_vulnerability_reporting: false",
+        Some(true),
+    );
+    assert_eq!(changes.len(), 1);
+    assert_eq!(
+        changes[0].summary,
+        "disable private vulnerability reporting"
+    );
+    assert_eq!(
+        changes[0].decode::<Payload>().unwrap(),
+        Payload::PrivateVulnerabilityReporting { enabled: false }
+    );
+}
+
+#[test]
+fn private_vulnerability_reporting_already_in_place_produces_no_change() {
+    assert!(
+        plan_with_reporting(
+            "security:\n  private_vulnerability_reporting: true",
+            Some(true)
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn private_vulnerability_reporting_is_left_alone_when_omitted() {
+    assert!(plan_with_reporting("security:\n  secret_scanning: false", Some(true)).is_empty());
+}
+
+#[test]
+fn unreported_private_vulnerability_reporting_is_still_planned() {
+    // Saying "up to date" about a setting GitHub never reported would claim a
+    // convergence nobody observed; applying it lets GitHub answer instead.
+    let changes = plan_with_reporting("security:\n  private_vulnerability_reporting: false", None);
+    assert_eq!(changes.len(), 1);
+    assert_eq!(
+        changes[0].fields[0].before.as_deref(),
+        Some("(not reported)")
+    );
+}
+
+#[test]
+fn private_vulnerability_reporting_is_exported_only_when_reported() {
+    assert_eq!(export_security(&current(json!({}))), None);
+
+    let exported = export_security(&current_with_reporting(json!({}), Some(true)))
+        .expect("a reported setting is exported");
+    assert_eq!(exported.private_vulnerability_reporting, Some(true));
 }

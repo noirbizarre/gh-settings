@@ -169,6 +169,7 @@ repository:
   security:
     secret_scanning: true
     secret_scanning_push_protection: true
+    private_vulnerability_reporting: true
 
 topics:
   - rust

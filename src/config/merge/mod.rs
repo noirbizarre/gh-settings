@@ -322,6 +322,7 @@ fn merge_security(
         secret_scanning_push_protection,
         dependabot_security_updates,
         secret_scanning_validity_checks,
+        private_vulnerability_reporting,
     } = c;
 
     macro_rules! field {
@@ -343,6 +344,7 @@ fn merge_security(
         secret_scanning_push_protection: field!(secret_scanning_push_protection),
         dependabot_security_updates: field!(dependabot_security_updates),
         secret_scanning_validity_checks: field!(secret_scanning_validity_checks),
+        private_vulnerability_reporting: field!(private_vulnerability_reporting),
     })
 }
 
